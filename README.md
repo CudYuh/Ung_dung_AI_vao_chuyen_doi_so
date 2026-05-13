@@ -71,3 +71,9 @@ The application enables users to:
  venv\Scripts\activate
  cd FastAPIApplication
  uvicorn main:app --reload
+# cài đặt môi & trường thư viện
+uv sync
+ # chạy backend
+ uv run uvicorn main:app --reload
+ # chạy frontend
+ npm run dev

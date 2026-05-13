@@ -24,6 +24,7 @@ dependencies = [
     "sqlalchemy>=2.0.37",
     "uvicorn>=0.34.0",
     "ipykernel>=6.29.5",
+    "pandas>=3.0.3",
 ]
 
 [build-system]
