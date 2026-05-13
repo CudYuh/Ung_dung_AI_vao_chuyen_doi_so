@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from routers import questions_and_answers, langchain_answers
+from fastapi.middleware.cors import CORSMiddleware
+from routers import questions_and_answers, products
 import models
 from database import engine
 
@@ -28,16 +29,26 @@ The application allows users to:
 4. Perform full CRUD operations through RESTful endpoints
 """
 
+# initilizing our application
 app = FastAPI(
     title="FastAPI-LangChain-QA-Manager",
     description=APP_DESCRIPTION,
     version="0.0.1"
 )
-# initilizing our application
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Trong thực tế nên giới hạn lại domain của frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 models.base.metadata.create_all(bind=engine)
 # Create database tables based on the models
 
 app.include_router(router=questions_and_answers.router)
-app.include_router(router=langchain_answers.router)
-# including our routers (in this case only two), to the application
+# app.include_router(router=langchain_answers.router)
+app.include_router(router=products.router)
+# including our routers
