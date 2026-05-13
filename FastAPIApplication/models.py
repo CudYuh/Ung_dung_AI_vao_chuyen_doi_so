@@ -11,18 +11,18 @@ class QAA(base):
 
 
 class Product(base):
-    __tablename__ = 'products'
+    __tablename__ = 'danh_muc_vat_tu'
 
-    id = Column(Integer, primary_key=True, index=True) # STT
-    category = Column(String) # Loại hàng hóa
-    name = Column(String, index=True) # Tên hàng hóa
-    unit = Column(String) # Đơn vị tính
-    specifications = Column(String) # Thông số kỹ thuật
-    price = Column(String) # Giá thẩm định(VND)
-    certificate_number = Column(String) # Chứng thư thẩm định số
-    appraisal_date = Column(String) # Ngày thẩm định
-    source = Column(String) # Nguồn dữ liệu
-    appraiser = Column(String) # Người thẩm định
+    id = Column('STT', Integer, primary_key=True, index=True)
+    category = Column('Loại hàng hóa', String)
+    name = Column('Tên hàng hóa', String, index=True)
+    unit = Column('Đơn vị tính', String)
+    specifications = Column('Thông số kỹ thuật', String)
+    price = Column('Giá thẩm định(VND)', String)
+    certificate_number = Column('Chứng thư thẩm định số', String)
+    appraisal_date = Column('Ngày thẩm định', String)
+    source = Column('Nguồn dữ liệu', String)
+    appraiser = Column('Người thẩm định', String)
 
 """
 INSIDE THE SQL DATABASE HERE IS THE EXACT DATA YOU WOULD WANT TO REPLICATE

@@ -1,10 +1,9 @@
-
 import pandas as pd
 from sqlalchemy import create_engine
 
 # 1. Thông tin cấu hình (Sửa lại cho đúng với máy của bạn)
 FILE_PATH = 'data.csv'
-DB_URL = "postgresql://postgres:123456@localhost:5432/vattu_db" # Thay 123456 bằng mật khẩu thật
+DB_URL = "postgresql://postgres:test12345!@localhost:5432/vattu_db" # Thay 123456 bằng mật khẩu thật
 
 def import_data():
     try:

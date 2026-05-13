@@ -1,7 +1,7 @@
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, cast, String
 from database import session_local
 from models import Product
 
@@ -27,8 +27,8 @@ async def search_products(db: db_dependency, q: str = Query(None, min_length=1))
         or_(
             Product.name.ilike(search_query),
             Product.specifications.ilike(search_query),
-            Product.category.ilike(search_query),
-            Product.certificate_number.ilike(search_query)
+            cast(Product.category, String).ilike(search_query),
+            cast(Product.certificate_number, String).ilike(search_query)
         )
     ).all()
     
