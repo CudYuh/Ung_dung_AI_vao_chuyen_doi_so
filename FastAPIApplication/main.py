@@ -45,8 +45,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-models.base.metadata.create_all(bind=engine)
-# Create database tables based on the models
+# Create database tables with error handling
+try:
+    models.base.metadata.create_all(bind=engine)
+except Exception as e:
+    print(f"Warning: Could not create database tables: {e}")
+    print("The application will continue to run, but database tables may not exist.")
 
 app.include_router(router=questions_and_answers.router)
 # app.include_router(router=langchain_answers.router)

@@ -65,3 +65,9 @@ The application enables users to:
 - Ensure all environment variables are properly set
 - Check database connection before starting the application
 - Make sure OpenAI API key is valid and has sufficient credits
+
+
+ python -m venv venv
+ venv\Scripts\activate
+ cd FastAPIApplication
+ uvicorn main:app --reload

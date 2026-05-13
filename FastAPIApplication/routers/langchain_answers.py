@@ -8,7 +8,7 @@ from database import session_local
 from models import QAA
 
 # OpenAI configuration
-OPENAI_API_KEY = ""
+OPENAI_API_KEY = "your-api-key-here"
 
 llm = ChatOpenAI(
     model_name="gpt-4o",
