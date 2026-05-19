@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import questions_and_answers, products
+from routers import questions_and_answers, products, valuation_api 
 import models
 from database import engine
 
@@ -56,3 +56,4 @@ app.include_router(router=questions_and_answers.router)
 # app.include_router(router=langchain_answers.router)
 app.include_router(router=products.router)
 # including our routers
+app.include_router(valuation_api.router)
