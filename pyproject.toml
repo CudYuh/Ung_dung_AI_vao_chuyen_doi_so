@@ -25,6 +25,8 @@ dependencies = [
     "uvicorn>=0.34.0",
     "ipykernel>=6.29.5",
     "pandas>=3.0.3",
+    "langchain-groq>=0.3.8",
+    "langchain-tavily>=0.2.18",
 ]
 
 [build-system]
