@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -16,7 +17,14 @@ router = APIRouter(
 )
 
 # --- KHỞI TẠO CÔNG CỤ TÌM KIẾM TAVILY ---
-tavily_search = TavilySearch(max_results=5)
+tavily_search = None
+if os.environ.get("TAVILY_API_KEY"):
+    try:
+        tavily_search = TavilySearch(max_results=5)
+    except Exception as e:
+        print(f"Warning: Could not initialize TavilySearch: {e}")
+else:
+    print("Warning: TAVILY_API_KEY environment variable is not set. TavilySearch tool will be disabled.")
 
 
 # --- HÀM TÌM KIẾM TRONG DATABASE NỘI BỘ ---
@@ -56,6 +64,8 @@ def search_in_db(product_name: str) -> dict:
 # --- HÀM TÌM KIẾM TRÊN INTERNET (TAVILY) ---
 def search_on_internet(product_name: str) -> str:
     """Tìm thông tin giá cả sản phẩm trên Internet bằng Tavily."""
+    if tavily_search is None:
+        return "Không tìm thấy thông tin trên Internet do chưa cấu hình Tavily API key."
     try:
         query = f"giá {product_name} thị trường Việt Nam VND"
         results = tavily_search.invoke(query)
