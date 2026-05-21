@@ -111,12 +111,16 @@ Thông tin thu thập được cho sản phẩm "{product_name}":
 {raw_data}
 ---
 
-Nhiệm vụ: Dựa trên thông tin trên, hãy đưa ra:
-1. Mức giá định giá dự kiến (hoặc khoảng giá) bằng VND
-2. Giải thích ngắn gọn căn cứ định giá
-3. Mức độ tin cậy của định giá này (cao/trung bình/thấp) và lý do
+Nhiệm vụ: Dựa trên thông tin trên, hãy đưa ra kết quả định giá theo các yêu cầu sau:
+1. Các mức giá tham khảo: Hãy trích xuất tối đa 2 thông tin báo giá/sản phẩm khác nhau từ dữ liệu thu thập. Với mỗi thông tin, BẮT BUỘC cung cấp:
+   - Tên/Mô tả ngắn gọn về sản phẩm tại nguồn đó.
+   - 1 Mức giá duy nhất bằng VND (Tuyệt đối không đưa ra khoảng giá, nếu là khoảng giá hãy tính trung bình hoặc chọn 1 mức hợp lý).
+   - Đường link (URL) hoặc Nguồn chính xác của thông tin đó.
+2. Mức giá định giá dự kiến chốt lại: Từ các nguồn tham khảo trên, đưa ra 1 mức giá định giá duy nhất cho "{product_name}".
+3. Giải thích ngắn gọn căn cứ định giá.
+4. Mức độ tin cậy (cao/trung bình/thấp) và lý do.
 
-Trả lời bằng tiếng Việt, súc tích và chuyên nghiệp."""
+Trả lời bằng tiếng Việt, rõ ràng, súc tích và chuyên nghiệp."""
 
         response = llm.invoke(synthesis_prompt)
         final_output = response.content

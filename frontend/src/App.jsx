@@ -271,9 +271,23 @@ function App() {
                 {/* AI Response */}
                 <div className="prose prose-invert prose-sm max-w-none">
                   <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
-                    <p className="text-slate-200 leading-relaxed whitespace-pre-wrap text-sm">
-                      {aiResult.valuation_result}
-                    </p>
+                    <div className="text-slate-200 leading-relaxed whitespace-pre-wrap text-sm">
+                      {(() => {
+                        const text = aiResult.valuation_result || '';
+                        const urlRegex = /(https?:\/\/[^\s]+)/g;
+                        const parts = text.split(urlRegex);
+                        return parts.map((part, index) => {
+                          if (part.match(urlRegex)) {
+                            return (
+                              <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline font-medium">
+                                {part}
+                              </a>
+                            );
+                          }
+                          return <span key={index}>{part}</span>;
+                        });
+                      })()}
+                    </div>
                   </div>
                 </div>
 
