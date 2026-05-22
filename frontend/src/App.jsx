@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { Search, Package, Cpu, Loader2, AlertCircle, Sparkles, Globe, Database, ChevronDown, ChevronUp } from 'lucide-react'
+import { Search, Package, Cpu, Loader2, AlertCircle, Sparkles, Globe, Database, ChevronDown, ChevronUp, ArrowLeft, Download, CheckCircle, FileText } from 'lucide-react'
 
 const API_BASE_URL = 'http://localhost:8000'
 
@@ -15,6 +15,11 @@ function App() {
   const [aiResult, setAiResult] = useState(null)
   const [aiError, setAiError] = useState(null)
   const [showRawData, setShowRawData] = useState(false)
+
+  // Approve price state
+  const [approving, setApproving] = useState(false)
+  const [approveSuccess, setApproveSuccess] = useState(null)
+  const [approvedProductData, setApprovedProductData] = useState(null)
 
   const searchProducts = async (searchQuery) => {
     if (!searchQuery.trim()) {
@@ -57,12 +62,36 @@ function App() {
         setAiError(data.error || 'AI gặp lỗi khi xử lý.')
       } else {
         setAiResult(data)
+        setApproveSuccess(null)
       }
     } catch (err) {
       console.error('AI error:', err)
       setAiError('Không thể kết nối với AI. Vui lòng thử lại.')
     } finally {
       setAiLoading(false)
+    }
+  }
+
+  const approvePrice = async (price, source, specs) => {
+    setApproving(true)
+    setApproveSuccess(null)
+    try {
+      const response = await axios.post(`${API_BASE_URL}/products/approve`, {
+        name: aiResult?.product || query,
+        price: String(price),
+        source: source || 'N/A',
+        specifications: specs || 'Theo kết quả AI'
+      })
+      if (response.data.status === 'success') {
+        setApproveSuccess('Đã phê duyệt giá và lưu vào cơ sở dữ liệu!')
+        setApprovedProductData(response.data.data)
+        searchProducts(query) // Refresh the products list
+      }
+    } catch (err) {
+      console.error('Lỗi khi phê duyệt giá:', err)
+      alert('Có lỗi xảy ra khi phê duyệt giá.')
+    } finally {
+      setApproving(false)
     }
   }
 
@@ -73,6 +102,87 @@ function App() {
     }, 500)
     return () => clearTimeout(timeOutId)
   }, [query])
+
+  // Nếu đã phê duyệt xong, hiển thị màn hình Chi tiết / In PDF
+  if (approvedProductData) {
+    const product = approvedProductData;
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-50 font-sans p-4 md:p-8 print:bg-white print:text-black print:p-0">
+        {/* Nút thao tác (ẩn khi in) */}
+        <div className="max-w-4xl mx-auto mb-8 flex justify-between items-center print:hidden">
+          <button
+            onClick={() => setApprovedProductData(null)}
+            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors bg-slate-900 px-4 py-2 rounded-xl border border-slate-800"
+          >
+            <ArrowLeft className="w-5 h-5" /> Quay lại tìm kiếm
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-blue-500/20 transition-all active:scale-95"
+          >
+            <Download className="w-5 h-5" /> Lưu PDF / In chứng thư
+          </button>
+        </div>
+
+        {/* Nội dung chứng thư (sẽ được in) */}
+        <div className="max-w-4xl mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-8 md:p-12 print:bg-white print:border-none print:shadow-none print:p-8 print:w-[100%] print:max-w-none">
+          <div className="text-center mb-10 border-b border-slate-800 pb-8 print:border-gray-300">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-400 mb-4 print:text-black print:bg-transparent">
+              <CheckCircle className="w-10 h-10" />
+            </div>
+            <h1 className="text-3xl font-bold text-slate-100 print:text-black mb-2 uppercase tracking-wide">Chứng Thư Phê Duyệt Giá</h1>
+            <p className="text-slate-500 print:text-gray-600 font-mono">Số: {product.certificate_number || 'N/A'}</p>
+          </div>
+
+          <div className="space-y-6 text-sm md:text-base">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 border-b border-slate-800/50 pb-6 print:border-gray-300 print:grid-cols-3">
+              <div className="text-slate-400 print:text-gray-600 font-medium">Tên tài sản:</div>
+              <div className="md:col-span-2 font-bold text-lg text-slate-100 print:text-black">{product.name}</div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 border-b border-slate-800/50 pb-6 print:border-gray-300 print:grid-cols-3">
+              <div className="text-slate-400 print:text-gray-600 font-medium">Loại tài sản:</div>
+              <div className="md:col-span-2 text-slate-300 print:text-black">{product.category || 'Tài sản định giá'}</div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 border-b border-slate-800/50 pb-6 print:border-gray-300 print:grid-cols-3">
+              <div className="text-slate-400 print:text-gray-600 font-medium">Đơn vị tính:</div>
+              <div className="md:col-span-2 text-slate-300 print:text-black">{product.unit || 'Cái'}</div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 border-b border-slate-800/50 pb-6 print:border-gray-300 print:grid-cols-3">
+              <div className="text-slate-400 print:text-gray-600 font-medium">Thông số kỹ thuật / Căn cứ:</div>
+              <div className="md:col-span-2 text-slate-300 print:text-black whitespace-pre-wrap">{product.specifications || 'N/A'}</div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 border-b border-slate-800/50 pb-6 print:border-gray-300 print:grid-cols-3">
+              <div className="text-slate-400 print:text-gray-600 font-medium">Nguồn tham khảo:</div>
+              <div className="md:col-span-2 text-blue-400 print:text-blue-600 break-words">{product.source || 'N/A'}</div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 border-b border-slate-800/50 pb-6 print:border-gray-300 print:grid-cols-3">
+              <div className="text-slate-400 print:text-gray-600 font-medium flex items-center h-full">Giá phê duyệt:</div>
+              <div className="md:col-span-2 text-2xl font-bold text-emerald-400 print:text-black">
+                {product.price} {String(product.price).toLowerCase().includes('vnd') ? '' : 'VND'}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-8 pt-8 text-center print:pt-16">
+              <div className="flex flex-col items-center">
+                <p className="font-medium mb-16 text-slate-300 print:text-black">Người yêu cầu</p>
+                <p className="text-slate-500 print:text-gray-500 italic">(Ký và ghi rõ họ tên)</p>
+              </div>
+              <div className="flex flex-col items-center">
+                <p className="mb-2 text-slate-400 print:text-gray-600">Ngày {(product.appraisal_date || '').split('/')[0] || '...'} tháng {(product.appraisal_date || '').split('/')[1] || '...'} năm {(product.appraisal_date || '').split('/')[2] || '2026'}</p>
+                <p className="font-medium mb-16 text-slate-300 print:text-black">Người phê duyệt </p>
+                <p className="text-slate-500 print:text-gray-500 italic">(Ký và ghi rõ họ tên)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const noDbResults = !loading && query && products.length === 0 && !error
 
@@ -270,25 +380,97 @@ function App() {
 
                 {/* AI Response */}
                 <div className="prose prose-invert prose-sm max-w-none">
-                  <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
-                    <div className="text-slate-200 leading-relaxed whitespace-pre-wrap text-sm">
-                      {(() => {
-                        const text = aiResult.valuation_result || '';
-                        const urlRegex = /(https?:\/\/[^\s]+)/g;
-                        const parts = text.split(urlRegex);
-                        return parts.map((part, index) => {
-                          if (part.match(urlRegex)) {
-                            return (
-                              <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline font-medium">
-                                {part}
-                              </a>
-                            );
-                          }
-                          return <span key={index}>{part}</span>;
-                        });
-                      })()}
-                    </div>
-                  </div>
+                  {(() => {
+                    const result = aiResult.valuation_result;
+                    if (!result) return null;
+
+                    if (typeof result === 'string') {
+                      const urlRegex = /(https?:\/\/[^\s]+)/g;
+                      const parts = result.split(urlRegex);
+                      return (
+                        <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700/50">
+                          <div className="text-slate-200 leading-relaxed whitespace-pre-wrap text-sm">
+                            {parts.map((part, index) => {
+                              if (part.match(urlRegex)) {
+                                return (
+                                  <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline font-medium">
+                                    {part}
+                                  </a>
+                                );
+                              }
+                              return <span key={index}>{part}</span>;
+                            })}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-6">
+                        {/* Final Price */}
+                        <div className="bg-gradient-to-r from-violet-600/20 to-indigo-600/20 rounded-xl p-5 border border-violet-500/30">
+                          <h4 className="text-violet-300 font-semibold mb-2">Giá chốt dự kiến:</h4>
+                          <div className="flex items-center justify-between flex-wrap gap-4">
+                            <span className="text-2xl font-bold text-white">{result.final_price} {String(result.final_price).toLowerCase().includes('vnd') ? '' : 'VND'}</span>
+                            <button
+                              onClick={() => approvePrice(result.final_price, 'AI Valuation', result.basis)}
+                              disabled={approving}
+                              className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                            >
+                              {approving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
+                              Phê duyệt giá này
+                            </button>
+                          </div>
+                          <p className="text-sm text-slate-300 mt-3"><span className="text-slate-400">Căn cứ:</span> {result.basis}</p>
+                          <div className="flex items-center gap-2 mt-3 text-xs">
+                            <span className={`px-2 py-1 rounded bg-slate-800 ${result.confidence === 'cao' ? 'text-emerald-400' : result.confidence === 'trung bình' ? 'text-amber-400' : 'text-red-400'}`}>
+                              Độ tin cậy: {result.confidence}
+                            </span>
+                            <span className="text-slate-500">{result.reason}</span>
+                          </div>
+                        </div>
+
+                        {/* References */}
+                        {result.reference_quotes && result.reference_quotes.length > 0 && (
+                          <div>
+                            <h4 className="text-slate-400 text-sm font-medium mb-3 uppercase tracking-wider">Các báo giá tham khảo:</h4>
+                            <div className="grid grid-cols-1 gap-4">
+                              {result.reference_quotes.map((quote, idx) => (
+                                <div key={idx} className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 flex flex-col sm:flex-row gap-4 justify-between">
+                                  <div className="space-y-2 flex-1">
+                                    <p className="text-slate-200 font-medium text-sm">{quote.description}</p>
+                                    <p className="text-blue-400 font-bold">{quote.price} {String(quote.price).toLowerCase().includes('vnd') ? '' : 'VND'}</p>
+                                    {quote.url && (
+                                      <a href={quote.url} target="_blank" rel="noopener noreferrer" className="text-xs text-violet-400 hover:underline inline-flex items-center gap-1">
+                                        <Globe className="w-3 h-3" /> Nguồn tham khảo
+                                      </a>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center shrink-0">
+                                    <button
+                                      onClick={() => approvePrice(quote.price, quote.url || 'Internet', quote.description)}
+                                      disabled={approving}
+                                      className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-2"
+                                    >
+                                      {approving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Database className="w-3 h-3" />}
+                                      Phê duyệt giá
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {approveSuccess && (
+                          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg text-sm flex items-center gap-2 mt-4">
+                            <Sparkles className="w-4 h-4" />
+                            {approveSuccess}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Raw data toggle */}
