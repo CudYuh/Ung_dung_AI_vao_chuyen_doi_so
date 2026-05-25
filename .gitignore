@@ -52,3 +52,23 @@ poetry.lock
 # OS
 .DS_Store
 Thumbs.db
+
+# Python environment
+.venv/
+__pycache__/
+*.pyc
+
+# Env keys
+.env
+FastAPIApplication/.env
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Generated LLM Wiki runtime
+FastAPIApplication/llm_wiki_runtime/
+
+# Editor
+.vscode/
