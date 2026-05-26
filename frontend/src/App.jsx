@@ -22,11 +22,13 @@ import {
   CalendarDays,
   UserRound,
   Layers,
+  FileUp,
 } from "lucide-react";
 
 const API_BASE_URL = "http://localhost:8000";
 
 function App() {
+  const [activeTab, setActiveTab] = useState("valuation");
   const [query, setQuery] = useState("");
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -47,6 +49,38 @@ function App() {
   const [knowledgeLoading, setKnowledgeLoading] = useState(false);
   const [knowledgeProfile, setKnowledgeProfile] = useState(null);
   const [knowledgeError, setKnowledgeError] = useState(null);
+
+  // Batch Valuation state
+  const [batchLoading, setBatchLoading] = useState(false);
+
+  const handleBatchUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setBatchLoading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/v1/valuate/batch`, formData, {
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "ket_qua_dinh_gia.csv");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error("Batch valuation error:", err);
+      alert("Lỗi khi định giá hàng loạt. Vui lòng kiểm tra lại file CSV.");
+    } finally {
+      setBatchLoading(false);
+      event.target.value = null;
+    }
+  };
 
   const searchProducts = async (searchQuery) => {
     if (!searchQuery.trim()) {
@@ -310,6 +344,37 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-blue-500/30">
+      <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="flex items-center gap-8 h-16">
+            <div className="flex gap-4">
+              <button
+                onClick={() => setActiveTab("valuation")}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-colors ${
+                  activeTab === "valuation"
+                    ? "bg-blue-500/10 text-blue-400"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                }`}
+              >
+                <Search className="w-4 h-4" />
+                Định giá
+              </button>
+              <button
+                onClick={() => setActiveTab("wiki")}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-colors ${
+                  activeTab === "wiki"
+                    ? "bg-violet-500/10 text-violet-400"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                }`}
+              >
+                <BookOpen className="w-4 h-4" />
+                Kho tri thức
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
       {showKnowledgeModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm px-4 py-8 overflow-y-auto">
           <div className="max-w-4xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden">
@@ -476,7 +541,9 @@ function App() {
         </div>
       )}
 
-      <header className="relative overflow-hidden pt-16 pb-12 px-4">
+      {activeTab === "valuation" ? (
+        <>
+          <header className="relative overflow-hidden pt-16 pb-12 px-4">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl h-full opacity-20 pointer-events-none">
           <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600 rounded-full blur-[120px]"></div>
           <div className="absolute bottom-[10%] right-[-5%] w-[30%] h-[30%] bg-indigo-600 rounded-full blur-[100px]"></div>
@@ -510,6 +577,26 @@ function App() {
               />
               {loading && (
                 <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+              )}
+            </div>
+          </div>
+
+          <div className="max-w-2xl mx-auto mt-6 text-center animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="inline-flex items-center gap-4 bg-slate-900/40 p-2 pr-5 rounded-2xl border border-slate-800/80 backdrop-blur-sm">
+              <label className={`cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-semibold rounded-xl shadow-[0_0_20px_-5px_rgba(16,185,129,0.4)] hover:shadow-[0_0_25px_-5px_rgba(16,185,129,0.6)] transition-all active:scale-95 ${batchLoading ? 'opacity-70 pointer-events-none' : ''}`}>
+                <FileUp className="w-4 h-4" />
+                Tải lên CSV định giá
+                <input type="file" accept=".csv" className="hidden" onChange={handleBatchUpload} disabled={batchLoading} />
+              </label>
+              {batchLoading ? (
+                <span className="text-sm text-slate-300 flex items-center gap-2 font-medium">
+                  <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                  Đang xử lý hàng loạt...
+                </span>
+              ) : (
+                <span className="text-sm text-slate-500 font-medium">
+                  Hỗ trợ định giá hàng loạt
+                </span>
               )}
             </div>
           </div>
@@ -978,6 +1065,10 @@ function App() {
           </div>
         )}
       </main>
+        </>
+      ) : (
+        <WikiTab />
+      )}
 
       <footer className="border-t border-slate-900 py-8 px-4 text-center">
         <p className="text-slate-600 text-sm">
@@ -1006,6 +1097,54 @@ function InfoCard({ icon, title, value, highlight = false }) {
       >
         {value}
       </p>
+    </div>
+  );
+}
+
+function WikiTab() {
+  return (
+    <div className="max-w-6xl mx-auto px-4 py-12">
+      <div className="text-center mb-12">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-violet-500/10 text-violet-400 mb-6">
+          <BookOpen className="w-8 h-8" />
+        </div>
+        <h2 className="text-4xl font-bold text-white mb-4">Kho Tri Thức (LLM Wiki)</h2>
+        <p className="text-slate-400 max-w-2xl mx-auto text-lg">
+          Hệ thống lưu trữ luật, thông tin doanh nghiệp, chuẩn mực thẩm định và các tài liệu liên quan để hỗ trợ quá trình định giá tự động.
+        </p>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-violet-500/50 transition-colors">
+          <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center mb-4">
+            <FileText className="w-6 h-6" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-100 mb-2">Luật & Chuẩn mực</h3>
+          <p className="text-slate-400 text-sm leading-relaxed">
+            Quản lý các văn bản pháp luật, quy định và chuẩn mực định giá chuyên ngành.
+          </p>
+        </div>
+        
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-violet-500/50 transition-colors">
+          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-4">
+            <Globe className="w-6 h-6" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-100 mb-2">Thông tin doanh nghiệp</h3>
+          <p className="text-slate-400 text-sm leading-relaxed">
+            Hồ sơ năng lực, báo cáo tài chính và dữ liệu của các doanh nghiệp đối tác.
+          </p>
+        </div>
+        
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-violet-500/50 transition-colors">
+          <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center mb-4">
+            <Database className="w-6 h-6" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-100 mb-2">Cơ sở dữ liệu giá</h3>
+          <p className="text-slate-400 text-sm leading-relaxed">
+            Tổng hợp dữ liệu lịch sử giá từ các nguồn đáng tin cậy.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

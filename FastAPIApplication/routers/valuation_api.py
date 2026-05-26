@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 import os
 import re
@@ -6,7 +8,9 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from dotenv import load_dotenv
-from fastapi import APIRouter
+from fastapi import APIRouter, File, UploadFile
+from fastapi.responses import StreamingResponse
+from starlette.concurrency import run_in_threadpool
 from langchain_groq import ChatGroq
 from langchain_tavily import TavilySearch
 from pydantic import BaseModel
@@ -25,6 +29,7 @@ router = APIRouter(
     prefix="/api/v1",
     tags=["Valuation"],
 )
+
 
 
 class ValuationRequest(BaseModel):
@@ -164,7 +169,7 @@ def normalize_valuation_result(result: Dict[str, Any]) -> Dict[str, Any]:
 
     normalized_quotes = []
 
-    for quote in reference_quotes[:5]:
+    for quote in reference_quotes[:3]:
         if not isinstance(quote, dict):
             continue
 
@@ -635,8 +640,7 @@ def search_on_internet(product_name: str, category_hint: str) -> str:
     return "\n\n".join(formatted)
 
 
-@router.post("/valuate")
-async def valuate_product(request: ValuationRequest):
+def sync_valuate_product(request: ValuationRequest):
     user_query = request.product_name.strip()
     understood = understand_product_query(user_query)
 
@@ -727,6 +731,8 @@ Nhiệm vụ:
 8. Nếu không đủ dữ liệu, final_price phải là "Không đủ dữ liệu định giá".
 9. confidence chỉ được là một trong ba giá trị: "cao", "trung bình", "thấp".
 10. legal_compliance phải nêu hệ thống đã tuân thủ quy tắc nào.
+11. BẮT BUỘC chỉ đưa ra 2 đến 3 nguồn tham khảo giá (reference_quotes).
+12. Các nguồn tham khảo Internet phải ưu tiên chọn lọc từ các shop, sàn thương mại điện tử, hoặc hệ thống bán lẻ uy tín (như Shopee Mall, LazMall, Tiki, Thế Giới Di Động, FPT Shop, CellphoneS, Điện Máy Xanh, Nguyễn Kim...).
 
 Trả về DUY NHẤT một JSON object theo định dạng:
 
@@ -786,3 +792,145 @@ Trả về DUY NHẤT một JSON object theo định dạng:
                 f"Lỗi khi xử lý yêu cầu: {str(e)}",
             ),
         }
+
+@router.post("/valuate")
+async def valuate_product(request: ValuationRequest):
+    return await run_in_threadpool(sync_valuate_product, request)
+
+@router.post("/valuate/batch")
+async def valuate_batch(file: UploadFile = File(...)):
+    try:
+        content = await file.read()
+        try:
+            decoded = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            decoded = content.decode("latin-1")
+            
+        reader = csv.reader(io.StringIO(decoded))
+        
+        async def iter_csv():
+            output = io.StringIO()
+            writer = csv.writer(output)
+            
+            headers = next(reader, None)
+            if headers is None:
+                yield "File CSV trống."
+                return
+            
+            # Thêm BOM để Excel đọc được tiếng Việt
+            yield '\ufeff'
+                
+            output_headers = headers + ["Gia_du_kien", "Link_tham_khao", "Ghi_chu"]
+            writer.writerow(output_headers)
+            yield output.getvalue()
+            output.seek(0)
+            output.truncate(0)
+            
+            for row in reader:
+                if not row or not any(row):
+                    continue
+                    
+                product_name = row[0].strip()
+                if not product_name:
+                    writer.writerow(row + ["", "", "Bỏ qua vì tên sản phẩm trống"])
+                    yield output.getvalue()
+                    output.seek(0)
+                    output.truncate(0)
+                    continue
+                    
+                try:
+                    db_result = await run_in_threadpool(search_in_db, product_name)
+                    
+                    if db_result["found"] and len(db_result["items"]) > 0:
+                        p = db_result["items"][0]
+                        price = str(p.price)
+                        link = str(p.source)
+                        note = "Có sẵn trong DB"
+                    else:
+                        req = ValuationRequest(product_name=product_name)
+                        res = await run_in_threadpool(sync_valuate_product, req)
+                        
+                        if res.get("status") == "success":
+                            val = res.get("valuation_result", {})
+                            price = str(val.get("final_price", ""))
+                            
+                            quotes = val.get("reference_quotes", [])
+                            link = str(quotes[0].get("url", "")) if quotes else ""
+                            note = "Tìm bằng AI & Đã lưu DB"
+                            
+                            if has_price_number(price):
+                                def save_to_db_sync(prod_name, prc, lnk, basis):
+                                    db = session_local()
+                                    try:
+                                        from sqlalchemy import func
+                                        from datetime import datetime
+                                        from services.llm_wiki.framework import sync_product_to_wiki
+                                        
+                                        max_id = db.query(func.max(Product.id)).scalar() or 0
+                                        new_id = int(max_id) + 1
+                                        
+                                        new_product = Product(
+                                            id=new_id,
+                                            name=prod_name,
+                                            price=prc,
+                                            source=lnk,
+                                            specifications=basis,
+                                            category="Tài sản định giá (Batch)",
+                                            unit="Cái",
+                                            appraisal_date=datetime.now().strftime("%d/%m/%Y"),
+                                            appraiser="AI System Batch",
+                                            certificate_number="AIB-" + datetime.now().strftime("%Y%m%d%H%M%S"),
+                                        )
+                                        db.add(new_product)
+                                        db.commit()
+                                        db.refresh(new_product)
+                                        
+                                        try:
+                                            sync_product_to_wiki(new_product)
+                                        except Exception:
+                                            pass
+                                    finally:
+                                        db.close()
+                                
+                                try:
+                                    await run_in_threadpool(
+                                        save_to_db_sync,
+                                        res.get("product") or product_name,
+                                        price,
+                                        link or "Internet AI",
+                                        str(val.get("basis", ""))[:500]
+                                    )
+                                except Exception as db_err:
+                                    note += f" (Lỗi lưu DB: {str(db_err)})"
+                        else:
+                            price = ""
+                            link = ""
+                            note = res.get("error", "Lỗi định giá AI")
+                            
+                except Exception as e:
+                    price = ""
+                    link = ""
+                    note = str(e)
+                    
+                writer.writerow(row + [price, link, note])
+                yield output.getvalue()
+                output.seek(0)
+                output.truncate(0)
+
+        return StreamingResponse(
+            iter_csv(),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=batch_valuation_result.csv"}
+        )
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@router.get("/valuate/test_batch")
+async def test_batch():
+    async def iter_test():
+        yield "a,b,c\n"
+        import asyncio
+        await asyncio.sleep(1)
+        yield "1,2,3\n"
+    return StreamingResponse(iter_test(), media_type="text/csv")
