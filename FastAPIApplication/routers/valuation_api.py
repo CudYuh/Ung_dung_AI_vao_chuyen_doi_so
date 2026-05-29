@@ -3,9 +3,16 @@ import io
 import json
 import os
 import re
+import threading
+import time
 import unicodedata
 from pathlib import Path
 from typing import Any, Dict, List
+
+try:
+    from duckduckgo_search import DDGS
+except ImportError:
+    DDGS = None
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, File, UploadFile
@@ -48,6 +55,17 @@ def normalize_text(value: str) -> str:
     value = strip_accents(value or "").lower()
     value = re.sub(r"[^a-z0-9]+", " ", value)
     return re.sub(r"\s+", " ", value).strip()
+
+
+def extract_lowest_price(price_str: str) -> str:
+    """Nếu giá là 1 khoảng (vd: 592.540.000 - 855.000.000), lấy giá thấp nhất."""
+    if not price_str:
+        return ""
+    # Tách các ký tự phân cách khoảng giá phổ biến
+    for sep in ["-", "~", " đến ", " tới "]:
+        if sep in price_str.lower():
+            return price_str.lower().split(sep)[0].strip()
+    return price_str.strip()
 
 
 def understand_product_query(product_name: str) -> Dict[str, Any]:
@@ -797,6 +815,274 @@ Trả về DUY NHẤT một JSON object theo định dạng:
 async def valuate_product(request: ValuationRequest):
     return await run_in_threadpool(sync_valuate_product, request)
 
+def _detect_product_column(headers: List[str]) -> int:
+    """
+    Tự động phát hiện cột chứa tên sản phẩm trong file CSV.
+
+    Ưu tiên:
+    1. Cột có tên chứa 'san_pham', 'sản phẩm', 'product', 'ten', 'tên'
+    2. Nếu chỉ có 1 cột text → dùng cột đó
+    3. Nếu có 2 cột trở lên, bỏ qua cột 'stt' / 'id' / 'no' → dùng cột text đầu tiên còn lại
+    """
+
+    PRODUCT_KEYWORDS = {"san_pham", "san pham", "sản phẩm", "product", "product_name", "ten", "tên", "name"}
+    SKIP_KEYWORDS = {"stt", "id", "no", "so_thu_tu", "số thứ tự"}
+
+    normalized_headers = [normalize_text(h) for h in headers]
+
+    # Bước 1: tìm header khớp từ khoá sản phẩm
+    for idx, norm in enumerate(normalized_headers):
+        for keyword in PRODUCT_KEYWORDS:
+            if keyword in norm:
+                return idx
+
+    # Bước 2: bỏ cột stt/id, lấy cột text đầu tiên còn lại
+    for idx, norm in enumerate(normalized_headers):
+        if norm in SKIP_KEYWORDS:
+            continue
+        # Bỏ cột toàn số
+        if norm.replace(" ", "").isdigit():
+            continue
+        return idx
+
+    # Fallback: nếu có >= 2 cột thì dùng cột thứ 2 (vì cột 0 thường là STT)
+    if len(headers) >= 2:
+        return 1
+
+    return 0
+
+
+# Rate limiter cho Tavily API — đảm bảo mỗi call cách nhau ít nhất 1.5s
+_tavily_lock = threading.Lock()
+_tavily_last_call_time = 0.0
+
+
+def _rate_limited_tavily_call(tavily_search, query: str) -> Any:
+    """Gọi Tavily API với rate limit: tối thiểu 1.5s giữa các lần gọi."""
+    global _tavily_last_call_time
+    with _tavily_lock:
+        now = time.time()
+        wait = 1.5 - (now - _tavily_last_call_time)
+        if wait > 0:
+            time.sleep(wait)
+        _tavily_last_call_time = time.time()
+    return tavily_search.invoke(query)
+
+
+def _search_duckduckgo(query: str, max_results: int = 3) -> List[Dict[str, str]]:
+    """Tìm kiếm bằng DuckDuckGo (bắt lỗi rate limit nếu có)."""
+    if not DDGS:
+        return []
+    try:
+        items = []
+        with DDGS() as ddgs:
+            # Dùng backend lite/html thường ổn định hơn
+            results = ddgs.text(query, max_results=max_results, backend="lite")
+            for r in results:
+                items.append({
+                    "title": r.get("title", ""),
+                    "content": r.get("body", ""),
+                    "url": r.get("href", "")
+                })
+        return items
+    except Exception:
+        return []
+
+
+def _sync_search_internet_for_batch(product_name: str) -> Dict[str, Any]:
+    """
+    Tìm kiếm Internet cho 1 sản phẩm trong batch.
+    Sử dụng rate limiter để tránh Tavily bị chặn.
+    """
+    if not os.environ.get("TAVILY_API_KEY"):
+        return {"price": "", "url": "", "description": "", "confidence": "thấp"}
+
+    try:
+        tavily_search = TavilySearch(max_results=5)
+    except Exception:
+        return {"price": "", "url": "", "description": "", "confidence": "thấp"}
+
+    # Dùng 2 queries ngắn gọn
+    queries = [
+        f"giá {product_name} chính hãng Việt Nam",
+        f"{product_name} giá bán",
+    ]
+
+    all_items: List[Dict[str, str]] = []
+
+    for query in queries:
+        # Ưu tiên tìm bằng Tavily trước
+        for attempt in range(3):
+            try:
+                raw_results = _rate_limited_tavily_call(tavily_search, query)
+                items = extract_tavily_results(raw_results)
+                for item in items:
+                    item["query"] = query
+                    item["source"] = "tavily"
+                    all_items.append(item)
+                break
+            except Exception:
+                wait_time = 2 * (attempt + 1)  # 2s, 4s, 6s
+                time.sleep(wait_time)
+                continue
+
+        # Thoát nếu đã có đủ dữ liệu từ Tavily
+        if len(all_items) >= 5:
+            break
+
+    # Nếu Tavily trả về quá ít dữ liệu (hoặc không có), dùng DuckDuckGo để bổ trợ
+    if len(all_items) < 3:
+        for query in queries:
+            ddg_results = _search_duckduckgo(query, max_results=3)
+            for r in ddg_results:
+                r["query"] = query
+                r["source"] = "duckduckgo"
+                all_items.append(r)
+            
+            if len(all_items) >= 5:
+                break
+
+    if not all_items:
+        return {"price": "", "url": "", "description": "", "confidence": "thấp"}
+
+    # Format kết quả cho LLM - Tối ưu hóa để tiết kiệm token
+    formatted = []
+    # Chỉ lấy tối đa 5 kết quả tốt nhất thay vì 10 để tiết kiệm token
+    for idx, item in enumerate(all_items[:5], start=1):
+        title = item.get("title") or ""
+        content = item.get("content") or ""
+        # Cắt ngắn nội dung còn 300 ký tự (đủ để AI đọc được giá xung quanh từ khóa)
+        if len(content) > 300:
+            content = content[:300] + "..."
+            
+        url = item.get("url") or ""
+        source = item.get("source") or "unknown"
+        formatted.append(
+            f"[{idx}] (Nguồn: {source}) {title}\nURL: {url}\n{content}"
+        )
+    internet_data = "\n\n".join(formatted)
+
+    # Dùng LLM để trích xuất giá
+    llm = ChatGroq(
+        temperature=0,
+        model="llama-3.3-70b-versatile",
+    ).bind(
+        response_format={"type": "json_object"}
+    )
+
+    prompt = f"""Trích xuất giá bán của sản phẩm "{product_name}" từ dữ liệu sau.
+
+{internet_data}
+
+Trả về JSON:
+{{
+  "final_price": "giá VND thấp nhất nếu có nhiều mức giá (chỉ trả về 1 số ví dụ: 15.990.000), hoặc ghi: Không đủ dữ liệu định giá",
+  "url": "URL nguồn có giá (bắt đầu bằng https://)",
+  "description": "tên nguồn"
+}}"""
+
+    try:
+        response = llm.invoke(prompt)
+        result = safe_json_loads(response.content)
+        return {
+            "price": str(result.get("final_price", "")).strip(),
+            "url": str(result.get("url", "")).strip(),
+            "description": str(result.get("description", "")).strip(),
+            "confidence": "trung bình",
+        }
+    except Exception:
+        return {"price": "", "url": "", "description": "", "confidence": "thấp"}
+
+
+async def _process_single_product(product_name: str) -> Dict[str, str]:
+    """Xử lý 1 sản phẩm: tìm DB → nếu không có thì AI search."""
+    try:
+        db_result = await run_in_threadpool(search_in_db, product_name)
+
+        if db_result["found"] and len(db_result["items"]) > 0:
+            best_match = db_result["items"][0]
+            product_norm = normalize_text(product_name)
+            for item in db_result["items"]:
+                item_norm = normalize_text(item.name or "")
+                if product_norm in item_norm or item_norm in product_norm:
+                    best_match = item
+                    break
+
+            price = extract_lowest_price(str(best_match.price))
+            link = str(best_match.source or "")
+            if not link.startswith("http"):
+                link = ""
+            note = "Có sẵn trong DB"
+        else:
+            ai_result = await run_in_threadpool(
+                _sync_search_internet_for_batch, product_name
+            )
+
+            price = extract_lowest_price(ai_result.get("price", ""))
+            link = ai_result.get("url", "")
+            note = "AI tìm kiếm"
+
+            if link and not link.startswith("http"):
+                link = ""
+
+            if has_price_number(price):
+                note = "AI tìm kiếm & Đã lưu DB"
+
+                def save_to_db_sync(prod_name, prc, lnk, desc):
+                    db = session_local()
+                    try:
+                        from sqlalchemy import func
+                        from datetime import datetime
+                        from services.llm_wiki.framework import sync_product_to_wiki
+
+                        max_id = db.query(func.max(Product.id)).scalar() or 0
+                        new_id = float(int(max_id) + 1)
+
+                        new_product = Product(
+                            id=new_id,
+                            name=prod_name,
+                            price=prc,
+                            source=lnk or "Internet AI",
+                            specifications=desc[:500] if desc else "",
+                            category=None,
+                            unit="Cái",
+                            appraisal_date=datetime.now().strftime("%d/%m/%Y"),
+                            appraiser="AI System Batch",
+                            certificate_number="AIB-" + datetime.now().strftime("%Y%m%d%H%M%S"),
+                        )
+                        db.add(new_product)
+                        db.commit()
+                        db.refresh(new_product)
+
+                        try:
+                            sync_product_to_wiki(new_product)
+                        except Exception:
+                            pass
+                    finally:
+                        db.close()
+
+                try:
+                    await run_in_threadpool(
+                        save_to_db_sync,
+                        product_name,
+                        price,
+                        link,
+                        ai_result.get("description", ""),
+                    )
+                except Exception:
+                    pass
+            else:
+                price = "Không đủ dữ liệu"
+                note = "AI không tìm được giá. Vui lòng liên hệ cơ sở, hệ thống buôn bán."
+
+    except Exception:
+        price = ""
+        link = ""
+        note = "AI không tìm được giá. Vui lòng liên hệ cơ sở, hệ thống buôn bán."
+
+    return {"price": price, "link": link, "note": note}
+
+
 @router.post("/valuate/batch")
 async def valuate_batch(file: UploadFile = File(...)):
     try:
@@ -809,6 +1095,8 @@ async def valuate_batch(file: UploadFile = File(...)):
         reader = csv.reader(io.StringIO(decoded))
         
         async def iter_csv():
+            import asyncio
+
             output = io.StringIO()
             writer = csv.writer(output)
             
@@ -816,6 +1104,9 @@ async def valuate_batch(file: UploadFile = File(...)):
             if headers is None:
                 yield "File CSV trống."
                 return
+            
+            # Tự động phát hiện cột chứa tên sản phẩm
+            product_col_idx = _detect_product_column(headers)
             
             # Thêm BOM để Excel đọc được tiếng Việt
             yield '\ufeff'
@@ -825,97 +1116,57 @@ async def valuate_batch(file: UploadFile = File(...)):
             yield output.getvalue()
             output.seek(0)
             output.truncate(0)
-            
+
+            # Thu thập tất cả rows trước
+            all_rows = []
             for row in reader:
                 if not row or not any(row):
                     continue
-                    
-                product_name = row[0].strip()
-                if not product_name:
-                    writer.writerow(row + ["", "", "Bỏ qua vì tên sản phẩm trống"])
+                all_rows.append(row)
+
+            # Xử lý song song theo batch (3 sản phẩm cùng lúc)
+            BATCH_SIZE = 3
+            for batch_start in range(0, len(all_rows), BATCH_SIZE):
+                batch_rows = all_rows[batch_start:batch_start + BATCH_SIZE]
+
+                # Tạo tasks song song cho batch này
+                tasks = []
+                for row in batch_rows:
+                    if product_col_idx < len(row):
+                        product_name = row[product_col_idx].strip()
+                    else:
+                        product_name = row[0].strip()
+
+                    if product_name:
+                        tasks.append(_process_single_product(product_name))
+                    else:
+                        # Placeholder cho sản phẩm trống
+                        async def empty_result():
+                            return {"price": "", "link": "", "note": "Bỏ qua vì tên sản phẩm trống"}
+                        tasks.append(empty_result())
+
+                # Chạy song song
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                # Ghi kết quả ra CSV
+                for row, result in zip(batch_rows, results):
+                    if isinstance(result, Exception):
+                        price, link, note = "", "", "AI không tìm được giá. Vui lòng liên hệ cơ sở, hệ thống buôn bán."
+                    else:
+                        price = result.get("price", "")
+                        link = result.get("link", "")
+                        note = result.get("note", "")
+
+                    # Wrap link trong công thức HYPERLINK để bấm được trong Excel
+                    if link and link.startswith("http"):
+                        excel_link = f'=HYPERLINK("{link}","{link}")'
+                    else:
+                        excel_link = link
+
+                    writer.writerow(row + [price, excel_link, note])
                     yield output.getvalue()
                     output.seek(0)
                     output.truncate(0)
-                    continue
-                    
-                try:
-                    db_result = await run_in_threadpool(search_in_db, product_name)
-                    
-                    if db_result["found"] and len(db_result["items"]) > 0:
-                        p = db_result["items"][0]
-                        price = str(p.price)
-                        link = str(p.source)
-                        note = "Có sẵn trong DB"
-                    else:
-                        req = ValuationRequest(product_name=product_name)
-                        res = await run_in_threadpool(sync_valuate_product, req)
-                        
-                        if res.get("status") == "success":
-                            val = res.get("valuation_result", {})
-                            price = str(val.get("final_price", ""))
-                            
-                            quotes = val.get("reference_quotes", [])
-                            link = str(quotes[0].get("url", "")) if quotes else ""
-                            note = "Tìm bằng AI & Đã lưu DB"
-                            
-                            if has_price_number(price):
-                                def save_to_db_sync(prod_name, prc, lnk, basis):
-                                    db = session_local()
-                                    try:
-                                        from sqlalchemy import func
-                                        from datetime import datetime
-                                        from services.llm_wiki.framework import sync_product_to_wiki
-                                        
-                                        max_id = db.query(func.max(Product.id)).scalar() or 0
-                                        new_id = int(max_id) + 1
-                                        
-                                        new_product = Product(
-                                            id=new_id,
-                                            name=prod_name,
-                                            price=prc,
-                                            source=lnk,
-                                            specifications=basis,
-                                            category="Tài sản định giá (Batch)",
-                                            unit="Cái",
-                                            appraisal_date=datetime.now().strftime("%d/%m/%Y"),
-                                            appraiser="AI System Batch",
-                                            certificate_number="AIB-" + datetime.now().strftime("%Y%m%d%H%M%S"),
-                                        )
-                                        db.add(new_product)
-                                        db.commit()
-                                        db.refresh(new_product)
-                                        
-                                        try:
-                                            sync_product_to_wiki(new_product)
-                                        except Exception:
-                                            pass
-                                    finally:
-                                        db.close()
-                                
-                                try:
-                                    await run_in_threadpool(
-                                        save_to_db_sync,
-                                        res.get("product") or product_name,
-                                        price,
-                                        link or "Internet AI",
-                                        str(val.get("basis", ""))[:500]
-                                    )
-                                except Exception as db_err:
-                                    note += f" (Lỗi lưu DB: {str(db_err)})"
-                        else:
-                            price = ""
-                            link = ""
-                            note = res.get("error", "Lỗi định giá AI")
-                            
-                except Exception as e:
-                    price = ""
-                    link = ""
-                    note = str(e)
-                    
-                writer.writerow(row + [price, link, note])
-                yield output.getvalue()
-                output.seek(0)
-                output.truncate(0)
 
         return StreamingResponse(
             iter_csv(),

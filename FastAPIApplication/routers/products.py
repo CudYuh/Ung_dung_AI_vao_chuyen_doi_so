@@ -70,7 +70,7 @@ async def approve_product(
     from sqlalchemy import func
 
     max_id = db.query(func.max(Product.id)).scalar() or 0
-    new_id = int(max_id) + 1
+    new_id = float(int(max_id) + 1)
 
     new_product = Product(
         id=new_id,
