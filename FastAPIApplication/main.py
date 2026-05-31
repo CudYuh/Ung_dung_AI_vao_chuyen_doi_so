@@ -12,7 +12,7 @@ PostgreSQL database backend, and LLM Wiki / Second Brain knowledge framework.
 Key Features:
 - RESTful API endpoints built with FastAPI
 - PostgreSQL database integration using SQLAlchemy ORM
-- AI valuation using Groq and Tavily
+- AI valuation using Ollama (local) and Tavily
 - Product search and approval workflow
 - LLM Wiki framework for knowledge organization
 - Markdown entity pages, concept pages, search index, and graph relationships
