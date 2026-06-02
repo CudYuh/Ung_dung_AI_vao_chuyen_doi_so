@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
-from langchain_groq import ChatGroq
+from langchain_ollama import ChatOllama
 from langchain_tavily import TavilySearch
 from pydantic import BaseModel
 from sqlalchemy import String, cast, or_
@@ -143,6 +143,115 @@ def has_price_number(value: Any) -> bool:
     return bool(re.search(r"\d", str(value)))
 
 
+def parse_price_number(price_str: Any) -> float | None:
+    """Trích xuất số tiền từ chuỗi giá, ví dụ '12.990.000 VND' -> 12990000.0"""
+    if price_str is None:
+        return None
+    text = str(price_str).strip()
+    # Loại bỏ các ký tự không phải số hoặc dấu chấm/phẩy
+    # Giá Việt Nam dùng dấu chấm phân cách hàng nghìn: 12.990.000
+    cleaned = re.sub(r"[^\d.,]", "", text)
+    if not cleaned:
+        return None
+    # Nếu có dấu chấm phân cách hàng nghìn (pattern: 12.990.000)
+    if re.match(r"^\d{1,3}(\.\d{3})+$", cleaned):
+        cleaned = cleaned.replace(".", "")
+    # Nếu có dấu phẩy phân cách hàng nghìn (pattern: 12,990,000)
+    elif re.match(r"^\d{1,3}(,\d{3})+$", cleaned):
+        cleaned = cleaned.replace(",", "")
+    else:
+        # Trường hợp đơn giản: chỉ lấy các chữ số
+        cleaned = re.sub(r"[^\d]", "", cleaned)
+    try:
+        return float(cleaned) if cleaned else None
+    except ValueError:
+        return None
+
+
+def check_price_consistency(
+    quotes: list[dict],
+    max_deviation_pct: float = 20.0,
+) -> dict:
+    """
+    Kiểm tra sự nhất quán giá giữa các nguồn tham khảo.
+
+    Returns:
+        {
+            "consistent": True/False,
+            "prices": [float, ...],
+            "deviation_pct": float,
+            "avg_price": float,
+            "status": "equal" | "acceptable" | "divergent",
+            "suggested_price": float | None,
+            "message": str,
+        }
+    """
+    prices = []
+    for q in quotes:
+        p = parse_price_number(q.get("price", ""))
+        if p and p > 0:
+            prices.append(p)
+
+    if len(prices) < 2:
+        return {
+            "consistent": False,
+            "prices": prices,
+            "deviation_pct": 0,
+            "avg_price": prices[0] if prices else 0,
+            "status": "insufficient",
+            "suggested_price": prices[0] if prices else None,
+            "message": "Chỉ tìm được 1 nguồn giá, cần ít nhất 2 nguồn để đối chiếu.",
+        }
+
+    min_p = min(prices)
+    max_p = max(prices)
+    avg_p = sum(prices) / len(prices)
+
+    if min_p == 0:
+        deviation_pct = 100.0
+    else:
+        deviation_pct = round(((max_p - min_p) / min_p) * 100, 1)
+
+    if deviation_pct == 0:
+        return {
+            "consistent": True,
+            "prices": prices,
+            "deviation_pct": 0,
+            "avg_price": avg_p,
+            "status": "equal",
+            "suggested_price": prices[0],
+            "message": f"Hai nguồn có giá hoàn toàn trùng khớp ({_format_vnd(prices[0])} VND).",
+        }
+    elif deviation_pct <= max_deviation_pct:
+        return {
+            "consistent": True,
+            "prices": prices,
+            "deviation_pct": deviation_pct,
+            "avg_price": avg_p,
+            "status": "acceptable",
+            "suggested_price": round(avg_p),
+            "message": f"Chênh lệch {deviation_pct}% (trong ngưỡng cho phép ≤{max_deviation_pct}%). Giá đề xuất: {_format_vnd(round(avg_p))} VND.",
+        }
+    else:
+        return {
+            "consistent": False,
+            "prices": prices,
+            "deviation_pct": deviation_pct,
+            "avg_price": avg_p,
+            "status": "divergent",
+            "suggested_price": None,
+            "message": f"Chênh lệch {deviation_pct}% giữa 2 nguồn (vượt ngưỡng {max_deviation_pct}%). Không thể tự động chốt giá — cần người dùng kiểm tra lại.",
+        }
+
+
+def _format_vnd(amount: float) -> str:
+    """Format số thành dạng tiền Việt: 12.990.000"""
+    if amount is None:
+        return "0"
+    s = f"{int(amount):,}".replace(",", ".")
+    return s
+
+
 def safe_json_loads(text: str) -> Dict[str, Any]:
     clean_output = (text or "").strip()
 
@@ -191,18 +300,45 @@ def normalize_valuation_result(result: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(quote, dict):
             continue
 
+        url = str(quote.get("url") or "").strip()
+        # Đảm bảo URL hợp lệ (bắt đầu bằng http)
+        if url and not url.startswith("http"):
+            url = ""
+
         normalized_quotes.append(
             {
                 "description": str(quote.get("description") or "Nguồn tham khảo").strip(),
                 "price": str(quote.get("price") or "Không rõ").strip(),
-                "url": str(quote.get("url") or "").strip(),
+                "url": url,
             }
         )
+
+    # --- Kiểm tra sự nhất quán giá giữa các nguồn ---
+    price_check = check_price_consistency(normalized_quotes)
 
     final_price = str(result.get("final_price") or "").strip()
     basis = str(result.get("basis") or "").strip()
     confidence = str(result.get("confidence") or "thấp").strip().lower()
     reason = str(result.get("reason") or "").strip()
+
+    # Tự động xác định giá chốt dựa trên kiểm tra nhất quán
+    if price_check["status"] == "equal":
+        # 2 nguồn giá bằng nhau → chốt ngay
+        final_price = f"{_format_vnd(price_check['suggested_price'])}"
+        confidence = "cao"
+        basis = f"Hai nguồn tham khảo cùng đưa ra mức giá {final_price} VND. {basis}"
+    elif price_check["status"] == "acceptable":
+        # Chênh lệch nhỏ ≤ 20% → lấy trung bình
+        final_price = f"{_format_vnd(price_check['suggested_price'])}"
+        confidence = "trung bình"
+        basis = f"Chênh lệch {price_check['deviation_pct']}% giữa các nguồn (chấp nhận được). Giá chốt = trung bình các nguồn. {basis}"
+    elif price_check["status"] == "divergent":
+        # Chênh lệch quá lớn → KHÔNG tự chốt giá
+        final_price = "Không đủ dữ liệu định giá"
+        confidence = "thấp"
+        basis = f"Giá giữa các nguồn chênh lệch {price_check['deviation_pct']}% (vượt ngưỡng 20%). Cần người dùng kiểm tra và chọn nguồn phù hợp. {basis}"
+        reason = price_check["message"]
+    # else: insufficient — giữ nguyên giá từ AI
 
     legal_compliance = result.get("legal_compliance")
 
@@ -239,6 +375,7 @@ def normalize_valuation_result(result: Dict[str, Any]) -> Dict[str, Any]:
         "confidence": confidence,
         "reason": reason,
         "legal_compliance": legal_compliance,
+        "price_consistency": price_check,
     }
 
 
@@ -610,14 +747,15 @@ def search_on_internet(product_name: str, category_hint: str) -> str:
         return "Không tìm thấy thông tin trên Internet do chưa cấu hình Tavily API key."
 
     try:
-        tavily_search = TavilySearch(max_results=5)
+        tavily_search = TavilySearch(max_results=3)
     except Exception as e:
         return f"Không khởi tạo được công cụ tìm kiếm Internet: {str(e)}"
 
     queries = build_internet_queries(product_name, category_hint)
     all_items: List[Dict[str, str]] = []
 
-    for query in queries[:7]:
+    # Giới hạn 3 queries để tiết kiệm thời gian cho Ollama local
+    for query in queries[:3]:
         try:
             raw_results = tavily_search.invoke(query)
             items = extract_tavily_results(raw_results)
@@ -636,23 +774,25 @@ def search_on_internet(product_name: str, category_hint: str) -> str:
                 }
             )
 
+        # Dừng sớm nếu đã đủ kết quả
+        if len(all_items) >= 6:
+            break
+
     if not all_items:
         return "Không tìm thấy thông tin trên Internet."
 
     formatted = []
 
-    for idx, item in enumerate(all_items[:12], start=1):
+    # Giới hạn 6 nguồn, cắt nội dung 200 ký tự để giảm token cho model local
+    for idx, item in enumerate(all_items[:6], start=1):
         title = item.get("title") or "Nguồn tham khảo"
         content = item.get("content") or ""
+        if len(content) > 200:
+            content = content[:200] + "..."
         url = item.get("url") or ""
-        query = item.get("query") or ""
 
         formatted.append(
-            f"[Nguồn {idx}]\n"
-            f"Truy vấn: {query}\n"
-            f"Tiêu đề: {title}\n"
-            f"Nội dung: {content}\n"
-            f"URL: {url}"
+            f"[{idx}] {title}\nURL: {url}\n{content}"
         )
 
     return "\n\n".join(formatted)
@@ -669,23 +809,20 @@ def sync_valuate_product(request: ValuationRequest):
     try:
         db_result = search_in_db(product_name)
         knowledge_data = search_in_knowledge_layer(product_name)
-        legal_rules = load_legal_rules_for_ai()
 
         if db_result["found"]:
             data_source = "database_internal"
-            internet_data = "Không cần tìm Internet vì đã có dữ liệu nội bộ."
+            internet_data = "Đã có dữ liệu nội bộ."
         else:
             data_source = "internet_ai"
             internet_data = search_on_internet(product_name, category_hint)
 
+        # Rút gọn raw_data để giảm token cho model local
         raw_data = (
-            f"[Truy vấn người dùng]\n{user_query}\n\n"
-            f"[Truy vấn đã chuẩn hóa]\n{product_name}\n\n"
-            f"[Giả định xử lý]\n{json.dumps(assumptions, ensure_ascii=False)}\n\n"
-            f"[Cơ sở dữ liệu nội bộ]\n{db_result['data']}\n\n"
-            f"[Kho tri thức nội bộ]\n{knowledge_data}\n\n"
-            f"[Luật và chuẩn mực định giá]\n{legal_rules}\n\n"
-            f"[Kết quả tìm kiếm Internet]\n{internet_data}"
+            f"[Truy vấn]\n{user_query} -> {product_name}\n\n"
+            f"[DB nội bộ]\n{db_result['data']}\n\n"
+            f"[Kho tri thức]\n{knowledge_data}\n\n"
+            f"[Internet]\n{internet_data}"
         )
 
         if (
@@ -706,15 +843,18 @@ def sync_valuate_product(request: ValuationRequest):
                 ),
             }
 
-        llm = ChatGroq(
+        llm = ChatOllama(
+            model="llama3.2",
             temperature=0,
-            model="llama-3.3-70b-versatile",
-        ).bind(
-            response_format={"type": "json_object"}
+            format="json",
+            num_predict=512,
         )
 
-        prompt = f"""
-Bạn là chuyên gia hỗ trợ định giá tài sản doanh nghiệp tại Việt Nam.
+        # Lấy quy tắc định giá
+        legal_rules = load_legal_rules_for_ai()
+        
+        # Prompt rút gọn tối ưu cho model local nhỏ
+        prompt = f"""Bạn là chuyên gia định giá tài sản tại Việt Nam. Phân tích dữ liệu và trả JSON.
 
 Người dùng nhập:
 "{user_query}"
@@ -744,22 +884,30 @@ Nhiệm vụ:
 3. Với vật tư, thiết bị, hàng hóa phổ thông, ưu tiên cách tiếp cận từ thị trường.
 4. Nếu truy vấn người dùng mơ hồ nhưng vẫn đoán được sản phẩm, phải ghi rõ giả định trong basis.
 5. Nếu thiếu phiên bản, đời máy, cấu hình, tình trạng, phải ghi rõ giả định định giá.
-6. Không được bịa giá nếu dữ liệu không có số tiền cụ thể.
+6. KHÔNG ĐƯỢC bịa giá. GIÁ PHẢI CHÍNH XÁC Y HỆT THEO URL, không tự làm tròn.
 7. Không được trả final_price rỗng, không được chỉ trả "VND" hoặc "VNĐ".
 8. Nếu không đủ dữ liệu, final_price phải là "Không đủ dữ liệu định giá".
 9. confidence chỉ được là một trong ba giá trị: "cao", "trung bình", "thấp".
 10. legal_compliance phải nêu hệ thống đã tuân thủ quy tắc nào.
-11. BẮT BUỘC chỉ đưa ra 2 đến 3 nguồn tham khảo giá (reference_quotes).
-12. Các nguồn tham khảo Internet phải ưu tiên chọn lọc từ các shop, sàn thương mại điện tử, hoặc hệ thống bán lẻ uy tín (như Shopee Mall, LazMall, Tiki, Thế Giới Di Động, FPT Shop, CellphoneS, Điện Máy Xanh, Nguyễn Kim...).
+11. SỐ LƯỢNG KẾT QUẢ: ƯU TIÊN CAO NHẤT LÀ TRẢ VỀ ĐÚNG 2 NGUỒN THAM KHẢO GIÁ KHÁC NHAU. Hãy cố gắng hết sức tìm 2 kết quả. Nếu dữ liệu hoàn toàn chỉ có 1 kết quả hợp lệ thì mới được trả về 1.
+12. TIÊU CHÍ CHỌN & CẤM BỊA ĐẶT: 
+   - Chỉ chọn kết quả KHỚP ĐÚNG SẢN PHẨM và BẮT BUỘC PHẢI CÓ CON SỐ GIÁ TIỀN bên trong đoạn văn của kết quả đó.
+   - TUYỆT ĐỐI KHÔNG LẤY GIÁ CỦA SẢN PHẨM NÀY GHÉP CHO SẢN PHẨM KHÁC. Nếu kết quả không ghi giá, BẮT BUỘC BỎ QUA.
+13. URL CHÍNH XÁC: Trường "url" BẮT BUỘC phải là link hợp lệ lấy từ phần Dữ liệu (bắt đầu bằng http/https). Tuyệt đối không được bỏ trống.
 
 Trả về DUY NHẤT một JSON object theo định dạng:
 
 {{
   "reference_quotes": [
     {{
-      "description": "Mô tả ngắn gọn nguồn tham khảo hoặc sản phẩm tham chiếu",
+      "description": "Tên trang - Tên sản phẩm chính xác 1",
       "price": "Mức giá bằng VND, ví dụ: 62.700.000",
-      "url": "URL hoặc tên nguồn"
+      "url": "https://url-thuc-te-cua-trang-web-1.com"
+    }},
+    {{
+      "description": "Tên trang - Tên sản phẩm chính xác 2",
+      "price": "Mức giá bằng VND, ví dụ: 63.500.000",
+      "url": "https://url-thuc-te-cua-trang-web-2.com"
     }}
   ],
   "final_price": "Mức giá định giá dự kiến bằng VND hoặc Không đủ dữ liệu định giá",
@@ -962,12 +1110,12 @@ def _sync_search_internet_for_batch(product_name: str) -> Dict[str, Any]:
         )
     internet_data = "\n\n".join(formatted)
 
-    # Dùng LLM để trích xuất giá
-    llm = ChatGroq(
+    # Dùng LLM để trích xuất giá (model nhẹ cho batch)
+    llm = ChatOllama(
+        model="qwen2.5:3b",
         temperature=0,
-        model="llama-3.3-70b-versatile",
-    ).bind(
-        response_format={"type": "json_object"}
+        format="json",
+        num_predict=256,
     )
 
     prompt = f"""Trích xuất giá bán của sản phẩm "{product_name}" từ dữ liệu sau.

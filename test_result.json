@@ -1,0 +1,25 @@
+{
+  "status": "success",
+  "product": "iPhone 15",
+  "original_query": "iPhone 15",
+  "normalized_query": "iPhone 15",
+  "assumptions": [],
+  "data_source": "database_internal",
+  "raw_data": "[Truy vấn người dùng]\niPhone 15\n\n[Truy vấn đã chuẩn hóa]\niPhone 15\n\n[Giả định xử lý]\n[]\n\n[Cơ sở dữ liệu nội bộ]\nTìm thấy 1 kết quả trong cơ sở dữ liệu nội bộ:\n- Tên: iphone 15 128gb | Giá thẩm định: 17.890.000 VND | Đơn vị: Cái | Thông số: iPhone 15 128GB | Chính hãng VN/A | Nguồn: https://cellphones.com.vn/iphone-15.html | Ngày: 23/05/2026\n\n[Kho tri thức nội bộ]\nTìm thấy 3 kết quả phù hợp trong kho tri thức nội bộ:\n- Tên: iphone 15 128gb | Giá: 17.890.000 VND | Đơn vị: Cái | Nguồn: https://cellphones.com.vn/iphone-15.html | Ngày: 23/05/2026 | Thông số: iPhone 15 128GB | Chính hãng VN/A\n- Tên: iphone 17 promax 1tb | Giá: 52.090.000 VND | Đơn vị: Cái | Nguồn: https://shopee.vn/Apple-iPhone-17-Pro-Max-1TB-Ch%C3%ADnh-h%C3%A3ng-ZP-A-i.308461157.27791320021 | Ngày: 23/05/2026 | Thông số: Apple iPhone 17 Pro Max 1TB Chính hãng ZP/A\n- Tên: iphone 11  128tb | Giá: 15.990.000 VND | Đơn vị: Cái | Nguồn: https://shopee.vn/iPhone-11-128GB-Ch%C3%ACnh-H%C3%A3ng-VN-A-i.288286284.6843442105 | Ngày: 24/05/2026 | Thông số: iPhone 11 128GB Chính Hãng VN/A\n\n[Luật và chuẩn mực định giá]\n[Văn bản pháp lý / chuẩn mực định giá]\n- Luật Giá số 16/2023/QH15 (Luật, Quốc hội, hiệu lực 01/07/2024): Luật Giá là cơ sở pháp lý nền tảng về quản lý giá, thẩm định giá, cơ sở dữ liệu về giá, hoạt động phân tích, dự báo giá thị trường và quản lý nhà nước trong lĩnh vực giá.\n- Nghị định 78/2024/NĐ-CP (Nghị định, Chính phủ, hiệu lực 01/07/2024): Nghị định quy định chi tiết một số điều của Luật Giá về thẩm định giá, liên quan đến hoạt động thẩm định giá, điều kiện, hồ sơ và trách nhiệm của các chủ thể tham gia.\n- Thông tư 30/2024/TT-BTC (Thông tư, Bộ Tài chính, hiệu lực 01/07/2024): Thông tư ban hành các chuẩn mực thẩm định giá Việt Nam về quy tắc đạo đức nghề nghiệp, phạm vi công việc, cơ sở giá trị thẩm định giá và hồ sơ thẩm định giá.\n- Thông tư 31/2024/TT-BTC (Thông tư, Bộ Tài chính, hiệu lực 01/07/2024): Thông tư ban hành chuẩn mực về thu thập và phân tích thông tin về tài sản thẩm định giá.\n- Thông tư 32/2024/TT-BTC (Thông tư, Bộ Tài chính, hiệu lực 01/07/2024): Thông tư ban hành các chuẩn mực thẩm định giá Việt Nam về cách tiếp cận từ thị trường, cách tiếp cận từ chi phí và cách tiếp cận từ thu nhập.\n\n[Quy tắc AI định giá phải tuân thủ]\n- [CRITICAL] Không bịa giá khi thiếu dữ liệu: Nếu không có giá cụ thể từ database nội bộ, kho tri thức, hoặc nguồn Internet đáng tin cậy, AI phải trả về 'Không đủ dữ liệu định giá', không được tự tạo ra mức giá. Căn cứ: Luật Giá số 16/2023/QH15, Thông tư 30/2024/TT-BTC, Thông tư 31/2024/TT-BTC.\n- [HIGH] Ưu tiên dữ liệu nội bộ đã thẩm định: Khi database nội bộ hoặc LLM Wiki có dữ liệu tương tự đã được thẩm định, AI phải ưu tiên dữ liệu này trước khi sử dụng dữ liệu Internet. Căn cứ: Luật Giá số 16/2023/QH15, Thông tư 30/2024/TT-BTC.\n- [HIGH] Ưu tiên cách tiếp cận từ thị trường với hàng hóa phổ thông: Với vật tư, thiết bị, hàng hóa, xe, máy móc phổ thông, AI cần ưu tiên cách tiếp cận từ thị trường: so sánh giá từ database, vật tư tương tự, báo giá đại lý, sàn thương mại điện tử hoặc nguồn bán hàng đáng tin cậy. Căn cứ: Thông tư 32/2024/TT-BTC.\n- [HIGH] Phải nêu giả định khi truy vấn mơ hồ: Nếu người dùng nhập thiếu thông tin như đời xe, model, cấu hình, tình trạng, dung lượng, phiên bản, AI được phép mở rộng truy vấn nhưng phải ghi rõ giả định trong phần căn cứ. Căn cứ: Thông tư 31/2024/TT-BTC, Thông tư 30/2024/TT-BTC.\n- [MEDIUM] Bắt buộc có độ tin cậy: Mọi kết quả định giá phải có độ tin cậy: cao, trung bình hoặc thấp. Độ tin cậy phải dựa trên số lượng nguồn, chất lượng nguồn và mức độ khớp thông số sản phẩm. Căn cứ: Thông tư 30/2024/TT-BTC, Thông tư 31/2024/TT-BTC.\n- [CRITICAL] AI chỉ hỗ trợ, không thay thế phê duyệt: Kết quả AI chỉ là tham khảo. Chỉ khi người dùng có thẩm quyền bấm phê duyệt thì kết quả mới được lưu vào database và trở thành dữ liệu tham chiếu cho các lần sau. Căn cứ: Nghị định 78/2024/NĐ-CP, Thông tư 30/2024/TT-BTC.\n- [HIGH] Lưu hồ sơ sau phê duyệt: Sau khi phê duyệt, hệ thống phải lưu lại tên tài sản, giá phê duyệt, căn cứ, nguồn dữ liệu, ngày phê duyệt, người phê duyệt và đồng bộ vào LLM Wiki để tái sử dụng. Căn cứ: Luật Giá số 16/2023/QH15, Thông tư 30/2024/TT-BTC.\n\n[Kết quả tìm kiếm Internet]\nKhông cần tìm Internet vì đã có dữ liệu nội bộ.",
+  "valuation_result": {
+    "reference_quotes": [
+      {
+        "description": "iPhone 15 128GB Chính hãng VN/A, từ Cellphones.com.vn",
+        "price": "17.890.000 VND",
+        "url": "https://cellphones.com.vn/iphone-15.html"
+      }
+    ],
+    "final_price": "17.890.000 VND",
+    "basis": "Dữ liệu từ database nội bộ đã thẩm định, iPhone 15 128GB Chính hãng VN/A, ngày 23/05/2026.",
+    "confidence": "cao",
+    "reason": "Dựa trên dữ liệu từ nguồn đáng tin cậy và phù hợp với yêu cầu của người dùng.",
+    "legal_compliance": [
+      "Luật Giá số 16/2023/QH15, Nghị định 78/2024/NĐ-CP, Thông tư 30/2024/TT-BTC, Thông tư 31/2024/TT-BTC"
+    ]
+  }
+}

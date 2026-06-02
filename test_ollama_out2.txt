@@ -1,0 +1,17 @@
+{
+  "reference_quotes": [
+    {
+      "description": "Clickbuy - Samsung Galaxy Watch8: Đồng hồ AI theo dõi sức khỏe",
+      "price": "8990000"
+    },
+    {
+      "description": "Dienmayxanh.com - Đồng hồ Samsung Galaxy Watch 8",
+      "price": "2500000"
+    }
+  ],
+  "final_price": "Không đủ dữ liệu định giá",
+  "basis": "căn cứ định giá",
+  "confidence": "thấp",
+  "reason": "Chỉ có hai nguồn tham khảo và cả hai đều không cung cấp đủ thông tin về sản phẩm đồng hồ thông minh Samsung Galaxy Watch8. Các nguồn chỉ cung cấp thông tin về các ưu đãi hoặc giảm giá, nhưng không đưa ra giá cụ thể cho sản phẩm.",
+  "legal_compliance": ["quy tắc đã tuân thủ"]
+}
