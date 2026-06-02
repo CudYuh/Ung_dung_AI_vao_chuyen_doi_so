@@ -15,7 +15,7 @@ except ImportError:
     DDGS = None
 
 from dotenv import load_dotenv
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, File, UploadFile, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 from langchain_ollama import ChatOllama
@@ -28,7 +28,7 @@ from models import Product
 from services.llm_wiki.legal_rules import load_legal_rules_for_ai
 
 
-ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
+ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(dotenv_path=ENV_PATH)
 
 
@@ -959,9 +959,50 @@ Trả về DUY NHẤT một JSON object theo định dạng:
             ),
         }
 
+def take_desktop_screenshot_sync(product_name: str):
+    """Chụp ảnh toàn màn hình desktop (bao gồm taskbar có đồng hồ góc phải)"""
+    import pyautogui
+    import time
+    from datetime import datetime
+    from pathlib import Path
+    import re
+
+    # Chờ 3 giây để frontend nhận được kết quả và render lên màn hình
+    time.sleep(3)
+
+    # Định nghĩa thư mục lưu trữ (gốc dự án)
+    save_dir = Path(__file__).resolve().parents[2] / "screenshots"
+    save_dir.mkdir(exist_ok=True)
+
+    try:
+        # Chụp màn hình desktop
+        screenshot = pyautogui.screenshot()
+
+        # Tạo tên file an toàn dựa trên tên sản phẩm và thời gian
+        safe_name = re.sub(r"[^\w\-]", "_", product_name)[:40]
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{safe_name}_{timestamp}.png"
+        filepath = save_dir / filename
+        
+        # Lưu ảnh
+        screenshot.save(filepath)
+        print(f"Screenshot saved successfully: {filename}")
+        
+        # Thêm log hoặc in ra file để dễ kiểm tra
+        return str(filepath)
+    except Exception as e:
+        print(f"Error during screenshot: {type(e).__name__}")
+        return ""
+
+
 @router.post("/valuate")
-async def valuate_product(request: ValuationRequest):
-    return await run_in_threadpool(sync_valuate_product, request)
+async def valuate_product(request: ValuationRequest, background_tasks: BackgroundTasks):
+    result = await run_in_threadpool(sync_valuate_product, request)
+    
+    # Tự động trigger chụp màn hình sau khi có giá
+    background_tasks.add_task(take_desktop_screenshot_sync, request.product_name)
+    
+    return result
 
 def _detect_product_column(headers: List[str]) -> int:
     """

@@ -27,6 +27,8 @@ dependencies = [
     "pandas>=3.0.3",
     "langchain-ollama>=1.1.0",
     "langchain-tavily>=0.2.18",
+    "pyautogui>=0.9.54",
+    "mcp>=1.0.0",
 ]
 
 [build-system]
