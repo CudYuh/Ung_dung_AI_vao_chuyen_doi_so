@@ -23,6 +23,10 @@ import {
   UserRound,
   Layers,
   FileUp,
+  Settings,
+  Plus,
+  Trash2,
+  ExternalLink,
 } from "lucide-react";
 
 const API_BASE_URL = "http://localhost:8000";
@@ -369,6 +373,17 @@ function App() {
               >
                 <BookOpen className="w-4 h-4" />
                 Kho tri thức
+              </button>
+              <button
+                onClick={() => setActiveTab("domains")}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-colors ${
+                  activeTab === "domains"
+                    ? "bg-emerald-500/10 text-emerald-400"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                }`}
+              >
+                <Settings className="w-4 h-4" />
+                Quản lý Domain
               </button>
             </div>
           </div>
@@ -1066,8 +1081,10 @@ function App() {
         )}
       </main>
         </>
-      ) : (
+      ) : activeTab === "wiki" ? (
         <WikiTab />
+      ) : (
+        <DomainRegistryTab />
       )}
 
       <footer className="border-t border-slate-900 py-8 px-4 text-center">
@@ -1145,6 +1162,211 @@ function WikiTab() {
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function DomainRegistryTab() {
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [expandedCat, setExpandedCat] = useState(null);
+  const [newDomain, setNewDomain] = useState("");
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCatKey, setNewCatKey] = useState("");
+  const [newCatLabel, setNewCatLabel] = useState("");
+  const [newCatDomains, setNewCatDomains] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const fetchCategories = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/v1/domains/`);
+      setCategories(res.data.categories || []);
+    } catch (e) {
+      setError("Không thể tải danh sách domain.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchCategories(); }, []);
+
+  const handleAddDomain = async (catKey) => {
+    if (!newDomain.trim()) return;
+    setActionLoading(true);
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/domains/${catKey}/domains`, { domain: newDomain.trim() });
+      setNewDomain("");
+      fetchCategories();
+    } catch (e) {
+      alert(e.response?.data?.detail || "Lỗi khi thêm domain.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRemoveDomain = async (catKey, domain) => {
+    if (!confirm(`Xóa domain "${domain}" khỏi danh mục?`)) return;
+    setActionLoading(true);
+    try {
+      await axios.delete(`${API_BASE_URL}/api/v1/domains/${catKey}/domains`, { data: { domain } });
+      fetchCategories();
+    } catch (e) {
+      alert(e.response?.data?.detail || "Lỗi khi xóa domain.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCatKey.trim() || !newCatLabel.trim()) return;
+    setActionLoading(true);
+    try {
+      const domains = newCatDomains.split(/[,\n]/).map(d => d.trim()).filter(Boolean);
+      await axios.post(`${API_BASE_URL}/api/v1/domains/`, { key: newCatKey.trim(), label: newCatLabel.trim(), domains });
+      setNewCatKey(""); setNewCatLabel(""); setNewCatDomains(""); setShowAddCategory(false);
+      fetchCategories();
+    } catch (e) {
+      alert(e.response?.data?.detail || "Lỗi khi tạo danh mục.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteCategory = async (catKey) => {
+    if (!confirm(`Xóa toàn bộ danh mục "${catKey}"?`)) return;
+    setActionLoading(true);
+    try {
+      await axios.delete(`${API_BASE_URL}/api/v1/domains/${catKey}`);
+      if (expandedCat === catKey) setExpandedCat(null);
+      fetchCategories();
+    } catch (e) {
+      alert(e.response?.data?.detail || "Lỗi khi xóa danh mục.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-12">
+      <div className="text-center mb-10">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-400 mb-6">
+          <Globe className="w-8 h-8" />
+        </div>
+        <h2 className="text-4xl font-bold text-white mb-4">Quản Lý Domain Tìm Kiếm</h2>
+        <p className="text-slate-400 max-w-2xl mx-auto text-lg">
+          Cấu hình các domain ưu tiên cho từng danh mục sản phẩm. Tavily sẽ tập trung tìm kiếm giá trên các trang này.
+        </p>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 mb-6">
+          <AlertCircle className="w-5 h-5 shrink-0" /> <p>{error}</p>
+        </div>
+      )}
+
+      <div className="mb-6 flex justify-end">
+        <button
+          onClick={() => setShowAddCategory(!showAddCategory)}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+        >
+          <Plus className="w-4 h-4" /> Thêm danh mục mới
+        </button>
+      </div>
+
+      {showAddCategory && (
+        <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-6 mb-6 animate-in fade-in slide-in-from-top-2 duration-300">
+          <h3 className="text-lg font-bold text-slate-100 mb-4">Tạo danh mục mới</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Key (viết thường, không dấu)</label>
+              <input type="text" value={newCatKey} onChange={e => setNewCatKey(e.target.value)} placeholder="vd: car, appliance" className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 placeholder:text-slate-600 outline-none focus:border-emerald-500 transition" />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Tên hiển thị</label>
+              <input type="text" value={newCatLabel} onChange={e => setNewCatLabel(e.target.value)} placeholder="vd: Ô tô, Đồ gia dụng" className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 placeholder:text-slate-600 outline-none focus:border-emerald-500 transition" />
+            </div>
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm text-slate-400 mb-1">Danh sách domain (phân cách bằng dấu phẩy hoặc xuống dòng)</label>
+            <textarea value={newCatDomains} onChange={e => setNewCatDomains(e.target.value)} rows={3} placeholder="shopee.vn, lazada.vn, tiki.vn" className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 placeholder:text-slate-600 outline-none focus:border-emerald-500 transition resize-none" />
+          </div>
+          <div className="flex gap-3">
+            <button onClick={handleAddCategory} disabled={actionLoading} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-xl transition-colors">
+              {actionLoading ? "Đang tạo..." : "Tạo danh mục"}
+            </button>
+            <button onClick={() => setShowAddCategory(false)} className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition-colors">Hủy</button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-center py-16">
+          <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mx-auto mb-3" />
+          <p className="text-slate-400">Đang tải danh sách domain...</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {categories.map(cat => (
+            <div key={cat.key} className="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden hover:border-emerald-500/30 transition-colors">
+              <button
+                onClick={() => setExpandedCat(expandedCat === cat.key ? null : cat.key)}
+                className="w-full flex items-center justify-between p-5 text-left"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                    <Globe className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-100">{cat.label}</h3>
+                    <p className="text-xs text-slate-500 font-mono">{cat.key} · {cat.domain_count} domain</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-300 text-xs font-medium">{cat.domain_count} domain</span>
+                  {expandedCat === cat.key ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                </div>
+              </button>
+
+              {expandedCat === cat.key && (
+                <div className="border-t border-slate-800 p-5 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="flex flex-wrap gap-2 mb-5">
+                    {cat.domains.map(domain => (
+                      <div key={domain} className="group flex items-center gap-2 px-3 py-2 bg-slate-800 rounded-xl border border-slate-700 hover:border-red-500/40 transition-colors">
+                        <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                        <span className="text-sm text-slate-200">{domain}</span>
+                        <button onClick={() => handleRemoveDomain(cat.key, domain)} className="text-slate-600 hover:text-red-400 transition-colors ml-1" title="Xóa domain">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-3 items-center">
+                    <input
+                      type="text" value={newDomain} onChange={e => setNewDomain(e.target.value)}
+                      placeholder="Nhập domain mới, vd: gearvn.com"
+                      className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 outline-none focus:border-emerald-500 transition"
+                      onKeyDown={e => { if (e.key === "Enter") handleAddDomain(cat.key); }}
+                    />
+                    <button onClick={() => handleAddDomain(cat.key)} disabled={actionLoading} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2">
+                      <Plus className="w-4 h-4" /> Thêm
+                    </button>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-slate-800/50 flex justify-end">
+                    <button onClick={() => handleDeleteCategory(cat.key)} className="text-xs text-slate-500 hover:text-red-400 transition-colors flex items-center gap-1.5">
+                      <Trash2 className="w-3.5 h-3.5" /> Xóa toàn bộ danh mục này
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

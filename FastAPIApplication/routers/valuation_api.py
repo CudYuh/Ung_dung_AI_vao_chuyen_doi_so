@@ -1,31 +1,21 @@
 import csv
 import io
 import json
-import os
 import re
-import threading
-import time
 import unicodedata
 from pathlib import Path
 from typing import Any, Dict, List
-
-try:
-    from duckduckgo_search import DDGS
-except ImportError:
-    DDGS = None
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 from langchain_ollama import ChatOllama
-from langchain_tavily import TavilySearch
+from routers.tavily_search_service import search_and_price_product, search_and_price_product_batch
 from pydantic import BaseModel
-from sqlalchemy import String, cast, or_
 
-from database import session_local
-from models import Product
 from services.llm_wiki.legal_rules import load_legal_rules_for_ai
+from routers.domain_registry import get_domains_for_category, detect_category_from_keywords
 
 
 ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
@@ -73,60 +63,44 @@ def understand_product_query(product_name: str) -> Dict[str, Any]:
     plain = normalize_text(original)
 
     normalized = original
-    category_hint = "general"
     assumptions: List[str] = []
 
+    # --- Các rule đặc biệt để chuẩn hóa tên sản phẩm ---
     if re.search(r"\bip\s*\d+", plain):
         number = re.findall(r"\d+", plain)
         if number:
             normalized = f"iPhone {number[0]}"
-            category_hint = "smartphone"
             assumptions.append(f"Người dùng nhập '{original}', hệ thống hiểu là '{normalized}'.")
-
-    elif "iphone" in plain:
-        category_hint = "smartphone"
 
     elif "sh mode" in plain:
         normalized = "Honda SH Mode 125 2024 2025"
-        category_hint = "motorbike"
         assumptions.append(
             "Người dùng nhập SH Mode, hệ thống mở rộng thành Honda SH Mode 125 đời 2024/2025 để tìm giá tham khảo."
         )
 
-    elif "vision" in plain:
+    elif "vision" in plain and ("honda" in plain or "xe" in plain or plain.startswith("vision")):
         normalized = "Honda Vision 110 2024 2025"
-        category_hint = "motorbike"
         assumptions.append(
             "Người dùng nhập Vision, hệ thống mở rộng thành Honda Vision 110 đời 2024/2025."
         )
 
     elif "air blade" in plain or "airblade" in plain:
         normalized = "Honda Air Blade 125 160 2024 2025"
-        category_hint = "motorbike"
         assumptions.append(
             "Người dùng nhập Air Blade, hệ thống mở rộng thành Honda Air Blade 125/160 đời 2024/2025."
         )
 
-    elif "xe may" in plain or "xe ga" in plain:
-        category_hint = "motorbike"
+    elif "may in" in plain and "canon" in plain:
+        normalized = f"{original} chính hãng Việt Nam"
 
-    elif "may in" in plain:
-        category_hint = "printer"
+    # --- Nhận diện category TỰ ĐỘNG từ registry keywords ---
+    category_hint = detect_category_from_keywords(plain)
 
-        if "canon" in plain:
-            normalized = f"{original} chính hãng Việt Nam"
-
-    elif "laptop" in plain:
-        category_hint = "laptop"
-
-    elif "dieu hoa" in plain or "may lanh" in plain:
-        category_hint = "air_conditioner"
-
-    elif "camera" in plain:
-        category_hint = "camera"
-
-    elif "ban" in plain:
-        category_hint = "furniture"
+    if category_hint != "general":
+        assumptions.append(
+            f"Hệ thống nhận diện sản phẩm thuộc danh mục '{category_hint}', "
+            f"sẽ tìm kiếm trên các domain chuyên ngành đã đăng ký."
+        )
 
     return {
         "original": original,
@@ -379,423 +353,16 @@ def normalize_valuation_result(result: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def search_in_db(product_name: str) -> Dict[str, Any]:
-    db = session_local()
 
-    try:
-        search_query = f"%{product_name}%"
-
-        products = db.query(Product).filter(
-            or_(
-                Product.name.ilike(search_query),
-                Product.specifications.ilike(search_query),
-                cast(Product.category, String).ilike(search_query),
-                cast(Product.certificate_number, String).ilike(search_query),
-            )
-        ).all()
-
-        if not products:
-            return {
-                "found": False,
-                "data": f"Không tìm thấy '{product_name}' trong cơ sở dữ liệu nội bộ.",
-                "items": [],
-            }
-
-        result_lines = [f"Tìm thấy {len(products)} kết quả trong cơ sở dữ liệu nội bộ:"]
-
-        for p in products[:8]:
-            result_lines.append(
-                f"- Tên: {p.name} | Giá thẩm định: {p.price} VND "
-                f"| Đơn vị: {p.unit} | Thông số: {p.specifications} "
-                f"| Nguồn: {p.source} | Ngày: {p.appraisal_date}"
-            )
-
-        return {
-            "found": True,
-            "data": "\n".join(result_lines),
-            "items": products[:8],
-        }
-
-    except Exception as e:
-        return {
-            "found": False,
-            "data": f"Lỗi khi truy vấn cơ sở dữ liệu: {str(e)}",
-            "items": [],
-        }
-
-    finally:
-        db.close()
-
-
-KNOWLEDGE_STOPWORDS = {
-    "gia",
-    "moi",
-    "nhat",
-    "viet",
-    "nam",
-    "chinh",
-    "hang",
-    "tham",
-    "khao",
-    "bao",
-    "ban",
-    "san",
-    "pham",
-    "hang",
-    "hoa",
-    "thiet",
-    "bi",
-    "may",
-    "xe",
-    "doi",
-    "phien",
-    "ban",
-    "tieu",
-    "chuan",
-    "cao",
-    "cap",
-    "the",
-    "thao",
-    "dac",
-    "biet",
-    "cai",
-    "bo",
-    "chiec",
-    "nam",
-}
-
-
-BRAND_TOKENS = {
-    "honda",
-    "iphone",
-    "apple",
-    "canon",
-    "dell",
-    "hp",
-    "lenovo",
-    "asus",
-    "acer",
-    "samsung",
-    "lg",
-    "sony",
-    "daikin",
-    "panasonic",
-    "cisco",
-    "hikvision",
-    "dahua",
-}
-
-
-def short_text(value: Any, max_length: int = 350) -> str:
-    text = str(value or "").strip()
-
-    if len(text) <= max_length:
-        return text
-
-    return text[: max_length - 3] + "..."
-
-
-def knowledge_query_tokens(product_name: str) -> set[str]:
-    """
-    Lấy token quan trọng để lọc kết quả LLM Wiki.
-
-    Mục tiêu:
-    - Bỏ các số năm như 2024, 2025 vì dễ làm match sai.
-    - Bỏ token chung chung như giá, mới, Việt Nam.
-    - Giữ lại brand/model quan trọng như honda, sh, mode, iphone, canon...
-    """
-
-    normalized = normalize_text(product_name)
-    raw_tokens = normalized.split()
-
-    tokens: set[str] = set()
-
-    for token in raw_tokens:
-        if not token:
-            continue
-
-        # Bỏ năm 19xx/20xx vì dễ match nhầm với sản phẩm khác
-        if token.isdigit():
-            number = int(token)
-
-            if 1900 <= number <= 2099:
-                continue
-
-            # Bỏ các số quá chung chung trong truy vấn AI
-            if len(token) >= 4:
-                continue
-
-        # Giữ token ngắn đặc biệt như SH, IP
-        if len(token) < 3 and token not in {"sh", "ip"}:
-            continue
-
-        if token in KNOWLEDGE_STOPWORDS:
-            continue
-
-        tokens.add(token)
-
-    return tokens
-
-
-def knowledge_item_text(item: Dict[str, Any]) -> str:
-    return normalize_text(
-        " ".join(
-            [
-                str(item.get("name") or ""),
-                str(item.get("category") or ""),
-                str(item.get("unit") or ""),
-                str(item.get("specifications") or ""),
-                str(item.get("source") or ""),
-            ]
-        )
-    )
-
-
-def is_relevant_knowledge_item(
-    item: Dict[str, Any],
-    core_tokens: set[str],
-) -> bool:
-    if not core_tokens:
-        return False
-
-    text = knowledge_item_text(item)
-
-    if not text:
-        return False
-
-    matched_tokens = {token for token in core_tokens if token in text}
-
-    # Nếu truy vấn có brand rõ ràng, ví dụ Honda, iPhone, Canon,
-    # thì kết quả LLM Wiki bắt buộc phải chứa brand đó.
-    query_brands = core_tokens & BRAND_TOKENS
-
-    if query_brands and not any(brand in text for brand in query_brands):
-        return False
-
-    # Với truy vấn có nhiều token, cần ít nhất 2 token khớp.
-    # Ví dụ Honda SH Mode phải khớp ít nhất Honda + Mode hoặc Honda + SH.
-    if len(core_tokens) >= 3:
-        return len(matched_tokens) >= 2
-
-    # Với truy vấn ngắn hơn, chỉ cần 1 token khớp.
-    return len(matched_tokens) >= 1
-
-
-def search_in_knowledge_layer(product_name: str) -> str:
-    """
-    Tìm trong LLM Wiki nhưng lọc chặt để tránh kết quả không liên quan.
-
-    Ví dụ:
-    - Query: Honda SH Mode 125 2024 2025
-    - Không được trả Tivi chỉ vì có năm 2024 trong thông số.
-    """
-
-    try:
-        from services.llm_wiki.framework import search_wiki
-
-        raw_results = search_wiki(product_name, limit=40)
-
-        if not raw_results:
-            return f"Không tìm thấy '{product_name}' trong kho tri thức nội bộ."
-
-        core_tokens = knowledge_query_tokens(product_name)
-
-        filtered_results = []
-
-        seen_ids = set()
-
-        for item in raw_results:
-            item_id = item.get("source_id") or item.get("id") or item.get("name")
-
-            if item_id in seen_ids:
-                continue
-
-            if not is_relevant_knowledge_item(item, core_tokens):
-                continue
-
-            seen_ids.add(item_id)
-            filtered_results.append(item)
-
-            if len(filtered_results) >= 5:
-                break
-
-        if not filtered_results:
-            return (
-                f"Không tìm thấy dữ liệu nội bộ phù hợp cho '{product_name}'. "
-                "Kho tri thức không có vật tư tương tự đủ liên quan, hệ thống sẽ ưu tiên nguồn Internet và luật định giá."
-            )
-
-        lines = [f"Tìm thấy {len(filtered_results)} kết quả phù hợp trong kho tri thức nội bộ:"]
-
-        for item in filtered_results:
-            lines.append(
-                f"- Tên: {item.get('name')} | Giá: {item.get('price')} VND "
-                f"| Đơn vị: {item.get('unit')} | Nguồn: {item.get('source')} "
-                f"| Ngày: {item.get('appraisal_date')} "
-                f"| Thông số: {short_text(item.get('specifications'), 350)}"
-            )
-
-        return "\n".join(lines)
-
-    except Exception as e:
-        return f"Không truy vấn được kho tri thức nội bộ: {str(e)}"
-
-
-def extract_tavily_results(raw_results: Any) -> List[Dict[str, str]]:
-    items: List[Dict[str, str]] = []
-
-    if isinstance(raw_results, dict):
-        raw_items = raw_results.get("results") or []
-
-        if isinstance(raw_items, list):
-            iterable = raw_items
-        else:
-            iterable = [{"content": str(raw_items), "url": "", "title": ""}]
-
-    elif isinstance(raw_results, list):
-        iterable = raw_results
-
-    else:
-        iterable = [{"content": str(raw_results), "url": "", "title": ""}]
-
-    for item in iterable:
-        if not isinstance(item, dict):
-            items.append(
-                {
-                    "title": "",
-                    "content": str(item),
-                    "url": "",
-                }
-            )
-            continue
-
-        title = str(item.get("title") or "")
-        content = str(item.get("content") or item.get("snippet") or item.get("answer") or "")
-        url = str(item.get("url") or "")
-
-        if title.strip() or content.strip():
-            items.append(
-                {
-                    "title": title,
-                    "content": content,
-                    "url": url,
-                }
-            )
-
-    return items
-
-
-def build_internet_queries(product_name: str, category_hint: str) -> List[str]:
-    base = product_name.strip()
-
-    queries = [
-        f"giá {base} mới nhất Việt Nam",
-        f"{base} giá chính hãng Việt Nam",
-        f"{base} báo giá mới nhất",
-        f"{base} giá tham khảo đại lý",
-    ]
-
-    if category_hint == "motorbike":
-        queries.extend(
-            [
-                f"giá xe {base} Honda Việt Nam",
-                f"{base} giá niêm yết Honda Việt Nam",
-                f"{base} giá lăn bánh 2024 2025",
-                f"{base} phiên bản CBS ABS giá bán",
-                f"{base} giá đại lý xe máy Việt Nam",
-            ]
-        )
-
-    elif category_hint == "smartphone":
-        queries.extend(
-            [
-                f"{base} giá CellphoneS FPT Shop Thế Giới Di Động",
-                f"{base} VN/A giá chính hãng Apple Việt Nam",
-                f"{base} giá bán lẻ chính hãng",
-            ]
-        )
-
-    elif category_hint == "printer":
-        queries.extend(
-            [
-                f"{base} giá máy in chính hãng",
-                f"{base} giá Nguyễn Kim Điện Máy Xanh",
-            ]
-        )
-
-    elif category_hint == "laptop":
-        queries.extend(
-            [
-                f"{base} giá laptop chính hãng Việt Nam",
-                f"{base} giá FPT Shop CellphoneS Thế Giới Di Động",
-            ]
-        )
-
-    elif category_hint == "air_conditioner":
-        queries.extend(
-            [
-                f"{base} giá điều hòa Điện Máy Xanh Nguyễn Kim",
-                f"{base} giá chính hãng Việt Nam",
-            ]
-        )
-
-    return list(dict.fromkeys(queries))
 
 
 def search_on_internet(product_name: str, category_hint: str) -> str:
-    if not os.environ.get("TAVILY_API_KEY"):
-        return "Không tìm thấy thông tin trên Internet do chưa cấu hình Tavily API key."
-
-    try:
-        tavily_search = TavilySearch(max_results=3)
-    except Exception as e:
-        return f"Không khởi tạo được công cụ tìm kiếm Internet: {str(e)}"
-
-    queries = build_internet_queries(product_name, category_hint)
-    all_items: List[Dict[str, str]] = []
-
-    # Giới hạn 3 queries để tiết kiệm thời gian cho Ollama local
-    for query in queries[:3]:
-        try:
-            raw_results = tavily_search.invoke(query)
-            items = extract_tavily_results(raw_results)
-
-            for item in items:
-                item["query"] = query
-                all_items.append(item)
-
-        except Exception as e:
-            all_items.append(
-                {
-                    "title": "Lỗi tìm kiếm",
-                    "content": f"Lỗi khi tìm kiếm query '{query}': {str(e)}",
-                    "url": "",
-                    "query": query,
-                }
-            )
-
-        # Dừng sớm nếu đã đủ kết quả
-        if len(all_items) >= 6:
-            break
-
-    if not all_items:
-        return "Không tìm thấy thông tin trên Internet."
-
-    formatted = []
-
-    # Giới hạn 6 nguồn, cắt nội dung 200 ký tự để giảm token cho model local
-    for idx, item in enumerate(all_items[:6], start=1):
-        title = item.get("title") or "Nguồn tham khảo"
-        content = item.get("content") or ""
-        if len(content) > 200:
-            content = content[:200] + "..."
-        url = item.get("url") or ""
-
-        formatted.append(
-            f"[{idx}] {title}\nURL: {url}\n{content}"
-        )
-
-    return "\n\n".join(formatted)
+    """
+    Tìm kiếm Internet bằng Tavily Search API.
+    Ưu tiên whitelist domains, loại trừ bài báo/tin tức.
+    Giá phải đúng với giá trên link (giá sau giảm nếu có khuyến mãi).
+    """
+    return search_and_price_product(product_name, category_hint)
 
 
 def sync_valuate_product(request: ValuationRequest):
@@ -807,28 +374,21 @@ def sync_valuate_product(request: ValuationRequest):
     assumptions = understood["assumptions"]
 
     try:
-        db_result = search_in_db(product_name)
-        knowledge_data = search_in_knowledge_layer(product_name)
-
-        if db_result["found"]:
-            data_source = "database_internal"
-            internet_data = "Đã có dữ liệu nội bộ."
-        else:
-            data_source = "internet_ai"
-            internet_data = search_on_internet(product_name, category_hint)
+        # Luôn tìm kiếm trên Internet (AI định giá KHÔNG động đến DB)
+        data_source = "internet_ai"
+        internet_data = search_on_internet(product_name, category_hint)
 
         # Rút gọn raw_data để giảm token cho model local
         raw_data = (
             f"[Truy vấn]\n{user_query} -> {product_name}\n\n"
-            f"[DB nội bộ]\n{db_result['data']}\n\n"
-            f"[Kho tri thức]\n{knowledge_data}\n\n"
             f"[Internet]\n{internet_data}"
         )
 
         if (
-            "chưa cấu hình Tavily" in raw_data
+            "chưa cấu hình Tavily API key" in raw_data
             or "Không tìm thấy thông tin trên Internet" in raw_data
-        ) and not db_result["found"]:
+            or "Lỗi khi tìm kiếm trên Internet" in raw_data
+        ):
             return {
                 "status": "success",
                 "product": product_name,
@@ -839,7 +399,7 @@ def sync_valuate_product(request: ValuationRequest):
                 "raw_data": raw_data,
                 "valuation_result": build_no_data_result(
                     product_name,
-                    "Không có dữ liệu nội bộ và không có dữ liệu Internet đủ tin cậy.",
+                    "Không có dữ liệu Internet đủ tin cậy để định giá.",
                 ),
             }
 
@@ -880,34 +440,36 @@ Các luật và chuẩn mực định giá phải tuân thủ:
 
 Nhiệm vụ:
 1. Đưa ra mức giá định giá dự kiến bằng VND nếu có đủ dữ liệu.
-2. Ưu tiên dữ liệu nội bộ và kho tri thức nội bộ trước khi dùng Internet.
+2. CHỈ SỬ DỤNG DỮ LIỆU TỪ INTERNET để định giá. TUYỆT ĐỐI KHÔNG dùng dữ liệu nội bộ hay cơ sở dữ liệu.
 3. Với vật tư, thiết bị, hàng hóa phổ thông, ưu tiên cách tiếp cận từ thị trường.
 4. Nếu truy vấn người dùng mơ hồ nhưng vẫn đoán được sản phẩm, phải ghi rõ giả định trong basis.
 5. Nếu thiếu phiên bản, đời máy, cấu hình, tình trạng, phải ghi rõ giả định định giá.
 6. KHÔNG ĐƯỢC bịa giá. GIÁ PHẢI CHÍNH XÁC Y HỆT THEO URL, không tự làm tròn.
-7. Không được trả final_price rỗng, không được chỉ trả "VND" hoặc "VNĐ".
-8. Nếu không đủ dữ liệu, final_price phải là "Không đủ dữ liệu định giá".
-9. confidence chỉ được là một trong ba giá trị: "cao", "trung bình", "thấp".
-10. legal_compliance phải nêu hệ thống đã tuân thủ quy tắc nào.
-11. SỐ LƯỢNG KẾT QUẢ: ƯU TIÊN CAO NHẤT LÀ TRẢ VỀ ĐÚNG 2 NGUỒN THAM KHẢO GIÁ KHÁC NHAU. Hãy cố gắng hết sức tìm 2 kết quả. Nếu dữ liệu hoàn toàn chỉ có 1 kết quả hợp lệ thì mới được trả về 1.
-12. TIÊU CHÍ CHỌN & CẤM BỊA ĐẶT: 
+7. LẤY GIÁ THỰC TẾ/GIÁ KHUYẾN MÃI: Nếu nguồn thông tin ghi giá gốc (giá niêm yết) và giá sau khi giảm (giá khuyến mãi), bắt buộc phải lấy giá SAU KHI ĐÃ GIẢM GIÁ làm kết quả.
+8. Không được trả final_price rỗng, không được chỉ trả "VND" hoặc "VNĐ".
+9. Nếu không đủ dữ liệu, final_price phải là "Không đủ dữ liệu định giá".
+10. confidence chỉ được là một trong ba giá trị: "cao", "trung bình", "thấp".
+11. legal_compliance phải nêu hệ thống đã tuân thủ quy tắc nào.
+12. SỐ LƯỢNG KẾT QUẢ: ƯU TIÊN CAO NHẤT LÀ TRẢ VỀ ĐÚNG 2 NGUỒN THAM KHẢO GIÁ KHÁC NHAU. Hãy cố gắng hết sức tìm 2 kết quả. Nếu dữ liệu hoàn toàn chỉ có 1 kết quả hợp lệ thì mới được trả về 1.
+13. TIÊU CHÍ CHỌN & CẤM BỊA ĐẶT: 
    - Chỉ chọn kết quả KHỚP ĐÚNG SẢN PHẨM và BẮT BUỘC PHẢI CÓ CON SỐ GIÁ TIỀN bên trong đoạn văn của kết quả đó.
    - TUYỆT ĐỐI KHÔNG LẤY GIÁ CỦA SẢN PHẨM NÀY GHÉP CHO SẢN PHẨM KHÁC. Nếu kết quả không ghi giá, BẮT BUỘC BỎ QUA.
-13. URL CHÍNH XÁC: Trường "url" BẮT BUỘC phải là link hợp lệ lấy từ phần Dữ liệu (bắt đầu bằng http/https). Tuyệt đối không được bỏ trống.
+14. CHỈ LẤY GIÁ TỪ TRANG BÁN HÀNG: Chỉ được phép lấy số liệu giá từ các trang bán hàng, siêu thị điện máy, đại lý chính hãng. TUYỆT ĐỐI KHÔNG lấy giá được nhắc tới trong các bài báo, trang tin tức, hoặc trang đánh giá/review (ví dụ: vnexpress.net, dantri.com.vn, tinhte.vn, v.v.). URL của nguồn phải là URL của sản phẩm đang được bán.
+15. URL CHÍNH XÁC: Trường "url" BẮT BUỘC phải là link chi tiết đến tận trang bán sản phẩm đó (giữ nguyên đầy đủ tham số). Tuyệt đối không được tự ý rút gọn URL thành link trang chủ.
 
 Trả về DUY NHẤT một JSON object theo định dạng:
 
 {{
   "reference_quotes": [
     {{
-      "description": "Tên trang - Tên sản phẩm chính xác 1",
+      "description": "Chỉ ghi TÊN SẢN PHẨM chính xác (ví dụ: iPhone 16 Pro Max 256GB), TUYỆT ĐỐI KHÔNG kèm tên trang web/shop",
       "price": "Mức giá bằng VND, ví dụ: 62.700.000",
-      "url": "https://url-thuc-te-cua-trang-web-1.com"
+      "url": "https://url-chi-tiet-den-tan-trang-san-pham.com (tuyệt đối giữ nguyên link đầy đủ)"
     }},
     {{
-      "description": "Tên trang - Tên sản phẩm chính xác 2",
+      "description": "Chỉ ghi TÊN SẢN PHẨM chính xác, TUYỆT ĐỐI KHÔNG kèm tên trang web/shop",
       "price": "Mức giá bằng VND, ví dụ: 63.500.000",
-      "url": "https://url-thuc-te-cua-trang-web-2.com"
+      "url": "https://url-chi-tiet-den-tan-trang-san-pham.com"
     }}
   ],
   "final_price": "Mức giá định giá dự kiến bằng VND hoặc Không đủ dữ liệu định giá",
@@ -1000,228 +562,216 @@ def _detect_product_column(headers: List[str]) -> int:
     return 0
 
 
-# Rate limiter cho Tavily API — đảm bảo mỗi call cách nhau ít nhất 1.5s
-_tavily_lock = threading.Lock()
-_tavily_last_call_time = 0.0
+# === [LEGACY] Rate limiter cho Tavily API — commented out, replaced by Google Search Grounding ===
+# _tavily_lock = threading.Lock()
+# _tavily_last_call_time = 0.0
+#
+#
+# def _rate_limited_tavily_call(tavily_search, query: str) -> Any:
+#     """Gọi Tavily API với rate limit: tối thiểu 1.5s giữa các lần gọi."""
+#     global _tavily_last_call_time
+#     with _tavily_lock:
+#         now = time.time()
+#         wait = 1.5 - (now - _tavily_last_call_time)
+#         if wait > 0:
+#             time.sleep(wait)
+#         _tavily_last_call_time = time.time()
+#     return tavily_search.invoke(query)
+# === [END LEGACY] ===
 
 
-def _rate_limited_tavily_call(tavily_search, query: str) -> Any:
-    """Gọi Tavily API với rate limit: tối thiểu 1.5s giữa các lần gọi."""
-    global _tavily_last_call_time
-    with _tavily_lock:
-        now = time.time()
-        wait = 1.5 - (now - _tavily_last_call_time)
-        if wait > 0:
-            time.sleep(wait)
-        _tavily_last_call_time = time.time()
-    return tavily_search.invoke(query)
+# === [LEGACY] DuckDuckGo search — commented out, replaced by Google Search Grounding ===
+# def _search_duckduckgo(query: str, max_results: int = 3) -> List[Dict[str, str]]:
+#     """Tìm kiếm bằng DuckDuckGo (bắt lỗi rate limit nếu có)."""
+#     if not DDGS:
+#         return []
+#     try:
+#         items = []
+#         with DDGS() as ddgs:
+#             # Dùng backend lite/html thường ổn định hơn
+#             results = ddgs.text(query, max_results=max_results, backend="lite")
+#             for r in results:
+#                 items.append({
+#                     "title": r.get("title", ""),
+#                     "content": r.get("body", ""),
+#                     "url": r.get("href", "")
+#                 })
+#         return items
+#     except Exception:
+#         return []
+# === [END LEGACY] ===
 
 
-def _search_duckduckgo(query: str, max_results: int = 3) -> List[Dict[str, str]]:
-    """Tìm kiếm bằng DuckDuckGo (bắt lỗi rate limit nếu có)."""
-    if not DDGS:
-        return []
-    try:
-        items = []
-        with DDGS() as ddgs:
-            # Dùng backend lite/html thường ổn định hơn
-            results = ddgs.text(query, max_results=max_results, backend="lite")
-            for r in results:
-                items.append({
-                    "title": r.get("title", ""),
-                    "content": r.get("body", ""),
-                    "url": r.get("href", "")
-                })
-        return items
-    except Exception:
-        return []
+# === [LEGACY] _sync_search_internet_for_batch (Tavily + DuckDuckGo) — commented out ===
+# def _sync_search_internet_for_batch(product_name: str) -> Dict[str, Any]:
+#     """
+#     Tìm kiếm Internet cho 1 sản phẩm trong batch.
+#     Sử dụng rate limiter để tránh Tavily bị chặn.
+#     Ưu tiên tìm kiếm trong các domain đã đăng ký theo category.
+#     """
+#     if not os.environ.get("TAVILY_API_KEY"):
+#         return {"price": "", "url": "", "description": "", "confidence": "thấp"}
+#
+#     # Phát hiện category để lấy domain ưu tiên
+#     understood = understand_product_query(product_name)
+#     category_hint = understood["category_hint"]
+#     priority_domains = get_domains_for_category(category_hint)
+#
+#     try:
+#         if priority_domains:
+#             tavily_search = TavilySearch(
+#                 max_results=5,
+#                 include_domains=priority_domains,
+#             )
+#         else:
+#             tavily_search = TavilySearch(max_results=5)
+#     except Exception:
+#         return {"price": "", "url": "", "description": "", "confidence": "thấp"}
+#
+#     # Dùng 2 queries ngắn gọn
+#     queries = [
+#         f"giá {product_name} chính hãng Việt Nam",
+#         f"{product_name} giá bán",
+#     ]
+#
+#     all_items: List[Dict[str, str]] = []
+#
+#     for query in queries:
+#         # Ưu tiên tìm bằng Tavily trước (với domain ưu tiên)
+#         for attempt in range(3):
+#             try:
+#                 raw_results = _rate_limited_tavily_call(tavily_search, query)
+#                 items = extract_tavily_results(raw_results)
+#                 for item in items:
+#                     item["query"] = query
+#                     item["source"] = "tavily"
+#                     all_items.append(item)
+#                 break
+#             except Exception:
+#                 wait_time = 2 * (attempt + 1)  # 2s, 4s, 6s
+#                 time.sleep(wait_time)
+#                 continue
+#
+#         # Thoát nếu đã có đủ dữ liệu từ Tavily
+#         if len(all_items) >= 5:
+#             break
+#
+#     # Fallback: nếu dùng domain ưu tiên mà Tavily trả ít, tìm lại không giới hạn domain
+#     if len(all_items) < 2 and priority_domains:
+#         try:
+#             tavily_fallback = TavilySearch(max_results=3)
+#             for query in queries:
+#                 for attempt in range(2):
+#                     try:
+#                         raw_results = _rate_limited_tavily_call(tavily_fallback, query)
+#                         items = extract_tavily_results(raw_results)
+#                         for item in items:
+#                             item["query"] = query
+#                             item["source"] = "tavily_fallback"
+#                             all_items.append(item)
+#                         break
+#                     except Exception:
+#                         time.sleep(2 * (attempt + 1))
+#                         continue
+#                 if len(all_items) >= 5:
+#                     break
+#         except Exception:
+#             pass
+#
+#     # Nếu Tavily trả về quá ít dữ liệu (hoặc không có), dùng DuckDuckGo để bổ trợ
+#     if len(all_items) < 3:
+#         for query in queries:
+#             ddg_results = _search_duckduckgo(query, max_results=3)
+#             for r in ddg_results:
+#                 r["query"] = query
+#                 r["source"] = "duckduckgo"
+#                 all_items.append(r)
+#
+#             if len(all_items) >= 5:
+#                 break
+#
+#     if not all_items:
+#         return {"price": "", "url": "", "description": "", "confidence": "thấp"}
+#
+#     # Format kết quả cho LLM - Tối ưu hóa để tiết kiệm token
+#     formatted = []
+#     # Chỉ lấy tối đa 5 kết quả tốt nhất thay vì 10 để tiết kiệm token
+#     for idx, item in enumerate(all_items[:5], start=1):
+#         title = item.get("title") or ""
+#         content = item.get("content") or ""
+#         # Cắt ngắn nội dung còn 300 ký tự (đủ để AI đọc được giá xung quanh từ khóa)
+#         if len(content) > 300:
+#             content = content[:300] + "..."
+#
+#         url = item.get("url") or ""
+#         source = item.get("source") or "unknown"
+#         formatted.append(
+#             f"[{idx}] (Nguồn: {source}) {title}\nURL: {url}\n{content}"
+#         )
+#     internet_data = "\n\n".join(formatted)
+#
+#     # Dùng LLM để trích xuất giá (model nhẹ cho batch)
+#     llm = ChatOllama(
+#         model="qwen2.5:3b",
+#         temperature=0,
+#         format="json",
+#         num_predict=256,
+#     )
+#
+#     prompt = f"""Trích xuất giá bán của sản phẩm "{product_name}" từ dữ liệu sau.
+# LƯU Ý:
+# - Nếu có giá gốc (giá niêm yết) và giá sau khi giảm (giá khuyến mãi), BẮT BUỘC lấy giá SAU KHI ĐÃ GIẢM GIÁ làm kết quả.
+# - CHỈ LẤY GIÁ TỪ TRANG BÁN HÀNG.
+#
+# {internet_data}
+#
+# Trả về JSON:
+# {{
+#   "final_price": "giá VND thấp nhất",
+#   "url": "URL nguồn có giá (bắt đầu bằng https://)",
+#   "description": "tên nguồn"
+# }}"""
+#
+#     try:
+#         response = llm.invoke(prompt)
+#         result = safe_json_loads(response.content)
+#         return {
+#             "price": str(result.get("final_price", "")).strip(),
+#             "url": str(result.get("url", "")).strip(),
+#             "description": str(result.get("description", "")).strip(),
+#             "confidence": "trung bình",
+#         }
+#     except Exception:
+#         return {"price": "", "url": "", "description": "", "confidence": "thấp"}
+# === [END LEGACY] ===
 
 
 def _sync_search_internet_for_batch(product_name: str) -> Dict[str, Any]:
     """
     Tìm kiếm Internet cho 1 sản phẩm trong batch.
-    Sử dụng rate limiter để tránh Tavily bị chặn.
+    Sử dụng Tavily Search API + LLM để trích xuất giá.
+    Ưu tiên whitelist domains, lọc bỏ link bài báo/tin tức.
     """
-    if not os.environ.get("TAVILY_API_KEY"):
-        return {"price": "", "url": "", "description": "", "confidence": "thấp"}
-
-    try:
-        tavily_search = TavilySearch(max_results=5)
-    except Exception:
-        return {"price": "", "url": "", "description": "", "confidence": "thấp"}
-
-    # Dùng 2 queries ngắn gọn
-    queries = [
-        f"giá {product_name} chính hãng Việt Nam",
-        f"{product_name} giá bán",
-    ]
-
-    all_items: List[Dict[str, str]] = []
-
-    for query in queries:
-        # Ưu tiên tìm bằng Tavily trước
-        for attempt in range(3):
-            try:
-                raw_results = _rate_limited_tavily_call(tavily_search, query)
-                items = extract_tavily_results(raw_results)
-                for item in items:
-                    item["query"] = query
-                    item["source"] = "tavily"
-                    all_items.append(item)
-                break
-            except Exception:
-                wait_time = 2 * (attempt + 1)  # 2s, 4s, 6s
-                time.sleep(wait_time)
-                continue
-
-        # Thoát nếu đã có đủ dữ liệu từ Tavily
-        if len(all_items) >= 5:
-            break
-
-    # Nếu Tavily trả về quá ít dữ liệu (hoặc không có), dùng DuckDuckGo để bổ trợ
-    if len(all_items) < 3:
-        for query in queries:
-            ddg_results = _search_duckduckgo(query, max_results=3)
-            for r in ddg_results:
-                r["query"] = query
-                r["source"] = "duckduckgo"
-                all_items.append(r)
-            
-            if len(all_items) >= 5:
-                break
-
-    if not all_items:
-        return {"price": "", "url": "", "description": "", "confidence": "thấp"}
-
-    # Format kết quả cho LLM - Tối ưu hóa để tiết kiệm token
-    formatted = []
-    # Chỉ lấy tối đa 5 kết quả tốt nhất thay vì 10 để tiết kiệm token
-    for idx, item in enumerate(all_items[:5], start=1):
-        title = item.get("title") or ""
-        content = item.get("content") or ""
-        # Cắt ngắn nội dung còn 300 ký tự (đủ để AI đọc được giá xung quanh từ khóa)
-        if len(content) > 300:
-            content = content[:300] + "..."
-            
-        url = item.get("url") or ""
-        source = item.get("source") or "unknown"
-        formatted.append(
-            f"[{idx}] (Nguồn: {source}) {title}\nURL: {url}\n{content}"
-        )
-    internet_data = "\n\n".join(formatted)
-
-    # Dùng LLM để trích xuất giá (model nhẹ cho batch)
-    llm = ChatOllama(
-        model="qwen2.5:3b",
-        temperature=0,
-        format="json",
-        num_predict=256,
-    )
-
-    prompt = f"""Trích xuất giá bán của sản phẩm "{product_name}" từ dữ liệu sau.
-
-{internet_data}
-
-Trả về JSON:
-{{
-  "final_price": "giá VND thấp nhất nếu có nhiều mức giá (chỉ trả về 1 số ví dụ: 15.990.000), hoặc ghi: Không đủ dữ liệu định giá",
-  "url": "URL nguồn có giá (bắt đầu bằng https://)",
-  "description": "tên nguồn"
-}}"""
-
-    try:
-        response = llm.invoke(prompt)
-        result = safe_json_loads(response.content)
-        return {
-            "price": str(result.get("final_price", "")).strip(),
-            "url": str(result.get("url", "")).strip(),
-            "description": str(result.get("description", "")).strip(),
-            "confidence": "trung bình",
-        }
-    except Exception:
-        return {"price": "", "url": "", "description": "", "confidence": "thấp"}
+    return search_and_price_product_batch(product_name)
 
 
 async def _process_single_product(product_name: str) -> Dict[str, str]:
-    """Xử lý 1 sản phẩm: tìm DB → nếu không có thì AI search."""
+    """Xử lý 1 sản phẩm: luôn tìm kiếm AI trên Internet, KHÔNG dùng DB."""
     try:
-        db_result = await run_in_threadpool(search_in_db, product_name)
+        ai_result = await run_in_threadpool(
+            search_and_price_product_batch, product_name
+        )
 
-        if db_result["found"] and len(db_result["items"]) > 0:
-            best_match = db_result["items"][0]
-            product_norm = normalize_text(product_name)
-            for item in db_result["items"]:
-                item_norm = normalize_text(item.name or "")
-                if product_norm in item_norm or item_norm in product_norm:
-                    best_match = item
-                    break
+        price = extract_lowest_price(ai_result.get("price", ""))
+        link = ai_result.get("url", "")
+        note = "AI tìm kiếm"
 
-            price = extract_lowest_price(str(best_match.price))
-            link = str(best_match.source or "")
-            if not link.startswith("http"):
-                link = ""
-            note = "Có sẵn trong DB"
-        else:
-            ai_result = await run_in_threadpool(
-                _sync_search_internet_for_batch, product_name
-            )
+        if link and not link.startswith("http"):
+            link = ""
 
-            price = extract_lowest_price(ai_result.get("price", ""))
-            link = ai_result.get("url", "")
-            note = "AI tìm kiếm"
-
-            if link and not link.startswith("http"):
-                link = ""
-
-            if has_price_number(price):
-                note = "AI tìm kiếm & Đã lưu DB"
-
-                def save_to_db_sync(prod_name, prc, lnk, desc):
-                    db = session_local()
-                    try:
-                        from sqlalchemy import func
-                        from datetime import datetime
-                        from services.llm_wiki.framework import sync_product_to_wiki
-
-                        max_id = db.query(func.max(Product.id)).scalar() or 0
-                        new_id = float(int(max_id) + 1)
-
-                        new_product = Product(
-                            id=new_id,
-                            name=prod_name,
-                            price=prc,
-                            source=lnk or "Internet AI",
-                            specifications=desc[:500] if desc else "",
-                            category=None,
-                            unit="Cái",
-                            appraisal_date=datetime.now().strftime("%d/%m/%Y"),
-                            appraiser="AI System Batch",
-                            certificate_number="AIB-" + datetime.now().strftime("%Y%m%d%H%M%S"),
-                        )
-                        db.add(new_product)
-                        db.commit()
-                        db.refresh(new_product)
-
-                        try:
-                            sync_product_to_wiki(new_product)
-                        except Exception:
-                            pass
-                    finally:
-                        db.close()
-
-                try:
-                    await run_in_threadpool(
-                        save_to_db_sync,
-                        product_name,
-                        price,
-                        link,
-                        ai_result.get("description", ""),
-                    )
-                except Exception:
-                    pass
-            else:
-                price = "Không đủ dữ liệu"
-                note = "AI không tìm được giá. Vui lòng liên hệ cơ sở, hệ thống buôn bán."
+        if not has_price_number(price):
+            price = "Không đủ dữ liệu"
+            note = "AI không tìm được giá. Vui lòng liên hệ cơ sở, hệ thống buôn bán."
 
     except Exception:
         price = ""

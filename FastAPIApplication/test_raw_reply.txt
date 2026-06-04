@@ -1,0 +1,53 @@
+Dưới đây là giá bán chính xác của các phiên bản iPhone 16 từ Viettel Store:
+
+```json
+{
+  "results": [
+    {
+      "description": "Giá bán của iPhone 16 thường.",
+      "price": "18.990.000 VNĐ",
+      "url": "https://viettelstore.vn/dien-thoai/iphone-16-series"
+    },
+    {
+      "description": "Giá bán của iPhone 16 128GB.",
+      "price": "20.490.000 ₫",
+      "url": "https://viettelstore.vn/dien-thoai/iphone-16-series"
+    },
+    {
+      "description": "Giá bán của iPhone 16 Plus.",
+      "price": "21.990.000 VNĐ",
+      "url": "https://viettelstore.vn/dien-thoai/iphone-16-series"
+    },
+    {
+      "description": "Giá bán của iPhone 16 Pro.",
+      "price": "24.990.000 VNĐ",
+      "url": "https://viettelstore.vn/dien-thoai/iphone-16-series"
+    },
+    {
+      "description": "Giá bán của iPhone 16 Pro 128GB.",
+      "price": "28.990.000 VNĐ",
+      "url": "https://viettelstore.vn/dien-thoai/iphone-16-series"
+    },
+    {
+      "description": "Giá bán của iPhone 16 Pro Max.",
+      "price": "30.490.000 VNĐ",
+      "url": "https://viettelstore.vn/dien-thoai/iphone-16-series"
+    },
+    {
+      "description": "Giá bán của iPhone 16e 128GB khi mua kèm gói cước 5G Viettel.",
+      "price": "11.990.000 VNĐ",
+      "url": "https://viettelstore.vn/dien-thoai/iphone-16-series"
+    },
+    {
+      "description": "Giá bán của iPhone 16e 128GB trả góp.",
+      "price": "12.490.000 VNĐ",
+      "url": "https://viettelstore.vn/dien-thoai/iphone-16-series"
+    }
+  ]
+}
+```
+Các phiên bản khác nhau của iPhone 16 có các mức giá bán khác nhau tại Viettel Store. Cụ thể, iPhone 16 thường có giá 18.990.000 VNĐ. Phiên bản iPhone 16 128GB có giá 20.490.000 ₫. Đối với iPhone 16 Plus, giá bán là 21.990.000 VNĐ.
+
+Các mẫu Pro có giá cao hơn, với iPhone 16 Pro là 24.990.000 VNĐ, và iPhone 16 Pro 128GB có giá cụ thể là 28.990.000 VNĐ. Phiên bản cao cấp nhất, iPhone 16 Pro Max, được bán với giá 30.490.000 VNĐ.
+
+Ngoài ra, Viettel Store cũng cung cấp iPhone 16e 128GB với giá ưu đãi từ 11.990.000 VNĐ khi mua kèm gói cước 5G Viettel, hoặc 12.490.000 VNĐ khi mua trả góp.

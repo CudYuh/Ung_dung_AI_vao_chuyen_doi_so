@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import questions_and_answers, products, valuation_api, wiki
+from routers import questions_and_answers, products, valuation_api, wiki, domain_registry_api
 import models
 from database import engine
 
@@ -46,6 +46,7 @@ app.include_router(router=questions_and_answers.router)
 app.include_router(router=products.router)
 app.include_router(router=valuation_api.router)
 app.include_router(router=wiki.router)
+app.include_router(router=domain_registry_api.router)
 
 
 @app.get("/")

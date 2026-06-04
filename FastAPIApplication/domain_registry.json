@@ -1,0 +1,208 @@
+{
+  "_meta": {
+    "description": "Registry các domain và keywords theo từng loại sản phẩm. Tavily sẽ dùng include_domains để chỉ tìm giá trên các trang này. Keywords dùng để tự động nhận diện category.",
+    "updated_at": "2026-06-01"
+  },
+  "categories": {
+    "smartphone": {
+      "label": "Điện thoại / Smartphone",
+      "keywords": [
+        "iphone", "samsung galaxy", "oppo", "xiaomi", "redmi", "poco",
+        "realme", "vivo", "nokia", "google pixel", "oneplus",
+        "dien thoai", "smartphone", "di dong"
+      ],
+      "domains": [
+        "thegioididong.com",
+        "fptshop.com.vn",
+        "cellphones.com.vn",
+        "didongviet.vn",
+        "hoanghamobile.com",
+        "24hstore.vn"
+      ]
+    },
+    "laptop": {
+      "label": "Laptop / Máy tính xách tay",
+      "keywords": [
+        "laptop", "macbook", "thinkpad", "ideapad", "vivobook",
+        "zenbook", "rog", "tuf gaming", "nitro", "aspire",
+        "swift", "inspiron", "latitude", "xps", "pavilion",
+        "elitebook", "probook", "gram", "surface"
+      ],
+      "domains": [
+        "gearvn.com",
+        "thegioididong.com",
+        "fptshop.com.vn",
+        "cellphones.com.vn",
+        "phongvu.vn",
+        "anphatpc.com.vn",
+        "nguyenkim.com"
+      ]
+    },
+    "electronics": {
+      "label": "Thiết bị điện tử / Linh kiện",
+      "keywords": [
+        "gpu", "vga", "rtx", "gtx", "rx",
+        "cpu", "ram", "ssd", "hdd", "mainboard", "motherboard",
+        "psu", "case", "nguon may tinh", "man hinh",
+        "monitor", "loa", "tai nghe", "headphone", "earbuds",
+        "chuot", "ban phim", "keyboard", "mouse"
+      ],
+      "domains": [
+        "gearvn.com",
+        "phongvu.vn",
+        "anphatpc.com.vn",
+        "cellphones.com.vn",
+        "nguyenkim.com",
+        "memoryzone.com.vn",
+        "shopee.vn",
+        "lazada.vn",
+        "tiki.vn"
+      ]
+    },
+    "printer": {
+      "label": "Máy in / Thiết bị văn phòng",
+      "keywords": [
+        "may in", "printer", "canon lbp", "brother",
+        "epson", "may photocopy", "may scan", "scanner",
+        "may chieu", "projector"
+      ],
+      "domains": [
+        "nguyenkim.com",
+        "dienmayxanh.com",
+        "phongvu.vn",
+        "maytinhanphat.vn",
+        "thegioididong.com",
+        "shopee.vn",
+        "lazada.vn"
+      ]
+    },
+    "motorbike": {
+      "label": "Xe máy / Xe mô tô",
+      "keywords": [
+        "xe may", "xe ga", "xe so", "xe mo to",
+        "sh mode", "vision", "air blade", "airblade", "wave",
+        "winner", "exciter", "sirius", "janus", "grande",
+        "lead", "pcx", "sh 125", "sh 150", "sh 160",
+        "vario", "click", "future", "dream",
+        "yamaha nmax", "yamaha nvx", "vespa", "piaggio"
+      ],
+      "domains": [
+        "honda.com.vn",
+        "yamaha-motor.com.vn",
+        "suzuki.com.vn",
+        "piaggio.com.vn",
+        "xemayvn.com",
+        "bonbanh.com",
+        "2banh.vn",
+        "xe.chotot.com"
+      ]
+    },
+    "car": {
+      "label": "Ô tô",
+      "keywords": [
+        "toyota", "hyundai", "kia", "mazda", "ford",
+        "mitsubishi", "vinfast", "peugeot", "nissan",
+        "subaru", "volkswagen", "mercedes", "bmw", "audi", "lexus",
+        "vios", "camry", "corolla", "innova", "fortuner", "hilux",
+        "corolla cross", "raize", "veloz", "yaris",
+        "accent", "tucson", "santa fe", "santafe", "creta",
+        "stargazer", "stargazer x",
+        "seltos", "sonet", "sorento", "carnival", "k3", "k5",
+        "cx5", "cx 5", "cx8", "cx 8", "mazda2", "mazda3", "mazda6",
+        "ranger", "everest", "territory", "explorer",
+        "xpander", "outlander", "pajero", "attrage",
+        "fadil", "lux a", "lux sa", "vf5", "vf6", "vf7", "vf8", "vf9",
+        "o to", "oto", "xe hoi", "sedan", "suv", "crossover",
+        "hatchback", "pickup", "xe ban tai"
+      ],
+      "domains": [
+        "vinfastauto.com",
+        "toyota.com.vn",
+        "honda.com.vn",
+        "ford.com.vn",
+        "mitsubishi-motors.com.vn",
+        "hyundai.thanhcong.vn",
+        "kia.com.vn",
+        "mazda.vn",
+        "peugeot.vn",
+        "nissan.com.vn",
+        "suzuki.com.vn",
+        "subaru.asia",
+        "volkswagen-vietnam.com.vn",
+        "mercedes-benz.com.vn",
+        "bmw.vn",
+        "audi.vn",
+        "lexus.com.vn"
+      ]
+    },
+    "air_conditioner": {
+      "label": "Điều hòa / Máy lạnh",
+      "keywords": [
+        "dieu hoa", "may lanh", "air conditioner",
+        "daikin", "panasonic", "mitsubishi electric",
+        "tu lanh", "may giat", "may say", "may rua bat",
+        "lo vi song", "noi com dien", "quat dieu hoa"
+      ],
+      "domains": [
+        "dienmayxanh.com",
+        "nguyenkim.com",
+        "thegioididong.com",
+        "mediamart.vn",
+        "dienmay.com",
+        "shopee.vn",
+        "lazada.vn",
+        "tiki.vn"
+      ]
+    },
+    "camera": {
+      "label": "Camera / Thiết bị giám sát",
+      "keywords": [
+        "camera", "webcam", "hikvision", "dahua",
+        "camera ip", "camera wifi", "camera giam sat",
+        "camera hanh trinh", "gopro", "dji"
+      ],
+      "domains": [
+        "nguyenkim.com",
+        "dienmayxanh.com",
+        "phongvu.vn",
+        "cellphones.com.vn",
+        "camera-hanh-trinh.com",
+        "shopee.vn",
+        "lazada.vn"
+      ]
+    },
+    "furniture": {
+      "label": "Nội thất / Bàn ghế",
+      "keywords": [
+        "ban lam viec", "ban hoc", "ghe van phong", "ghe xoay",
+        "tu go", "tu sat", "ke sach", "giuong", "nem",
+        "sofa", "ban an", "tu quan ao", "noi that"
+      ],
+      "domains": [
+        "nfrn.vn",
+        "xuanhoa.net.vn",
+        "noithatluongson.vn",
+        "hoaphat.com.vn",
+        "shopee.vn",
+        "lazada.vn",
+        "tiki.vn"
+      ]
+    },
+    "general": {
+      "label": "Tổng hợp / Chung",
+      "keywords": [],
+      "domains": [
+        "shopee.vn",
+        "lazada.vn",
+        "tiki.vn",
+        "sendo.vn",
+        "thegioididong.com",
+        "nguyenkim.com",
+        "dienmayxanh.com",
+        "fptshop.com.vn",
+        "cellphones.com.vn",
+        "phongvu.vn"
+      ]
+    }
+  }
+}
