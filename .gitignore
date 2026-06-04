@@ -72,3 +72,15 @@ FastAPIApplication/llm_wiki_runtime/
 
 # Editor
 .vscode/
+
+.obsidian/
+**/.obsidian/
+
+.env
+*.env
+FastAPIApplication/.env
+__pycache__/
+*.pyc
+
+
+test_ollama_out*.txt

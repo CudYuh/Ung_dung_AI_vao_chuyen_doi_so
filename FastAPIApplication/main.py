@@ -1,8 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import questions_and_answers, products, valuation_api, wiki, domain_registry_api
+from fastapi.staticfiles import StaticFiles
+from routers import questions_and_answers, products, valuation_api, wiki, domain_registry_api, legal_knowledge
 import models
 from database import engine
+import os
+
 
 
 APP_DESCRIPTION = """
@@ -47,6 +50,12 @@ app.include_router(router=products.router)
 app.include_router(router=valuation_api.router)
 app.include_router(router=wiki.router)
 app.include_router(router=domain_registry_api.router)
+app.include_router(router=legal_knowledge.router)
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCREENSHOTS_DIR = os.path.join(BASE_DIR, "screenshots")
+os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
+app.mount("/screenshots", StaticFiles(directory=SCREENSHOTS_DIR), name="screenshots")
 
 
 @app.get("/")
