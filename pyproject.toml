@@ -29,6 +29,7 @@ dependencies = [
     "langchain-tavily>=0.2.18",
     "pyautogui>=0.9.54",
     "mcp>=1.0.0",
+    "openpyxl>=3.1.5",
 ]
 
 [build-system]

@@ -66,16 +66,31 @@ function App() {
         responseType: "blob",
       });
 
+      // Tự động nhận diện tên file và đuôi file từ phản hồi của server hoặc file đã tải lên ban đầu
+      const contentDisposition = response.headers["content-disposition"] || response.headers["Content-Disposition"];
+      let filename = "ket_qua_dinh_gia.csv";
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename=(.+)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, "");
+        }
+      } else {
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (ext === "xlsx" || ext === "xls") {
+          filename = `ket_qua_dinh_gia.${ext}`;
+        }
+      }
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", "ket_qua_dinh_gia.csv");
+      link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
     } catch (err) {
       console.error("Batch valuation error:", err);
-      alert("Lỗi khi định giá hàng loạt. Vui lòng kiểm tra lại file CSV.");
+      alert("Lỗi khi định giá hàng loạt. Vui lòng kiểm tra lại file CSV hoặc Excel.");
     } finally {
       setBatchLoading(false);
       event.target.value = null;
@@ -585,8 +600,8 @@ function App() {
             <div className="inline-flex items-center gap-4 bg-slate-900/40 p-2 pr-5 rounded-2xl border border-slate-800/80 backdrop-blur-sm">
               <label className={`cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-semibold rounded-xl shadow-[0_0_20px_-5px_rgba(16,185,129,0.4)] hover:shadow-[0_0_25px_-5px_rgba(16,185,129,0.6)] transition-all active:scale-95 ${batchLoading ? 'opacity-70 pointer-events-none' : ''}`}>
                 <FileUp className="w-4 h-4" />
-                Tải lên CSV định giá
-                <input type="file" accept=".csv" className="hidden" onChange={handleBatchUpload} disabled={batchLoading} />
+                Tải lên CSV / Excel định giá
+                <input type="file" accept=".csv, .xlsx, .xls" className="hidden" onChange={handleBatchUpload} disabled={batchLoading} />
               </label>
               {batchLoading ? (
                 <span className="text-sm text-slate-300 flex items-center gap-2 font-medium">
