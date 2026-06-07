@@ -1,0 +1,44 @@
+# Attomat
+
+## Thông tin định giá
+
+- ID database: 112.0
+- Tên hàng hóa: Attomat
+- Loại hàng hóa: Chưa xác định
+- Đơn vị tính: Cái
+- Giá thẩm định: 85.800 VND
+- Ngày thẩm định: 17/11/2025
+- Chứng thư thẩm định: 405/2025/896/
+- Nguồn dữ liệu: …
+- Người thẩm định: Bùi Thị Trà Giang
+
+## Thông số kỹ thuật
+
+Số cực: 2P
+Dòng điện: 20A
+Dòng ngắn mạch: 1.5kA
+Điện áp: 230VAC, 240VAC, 380VAC, 400VAC, 415VAC, 440VAC
+Loại: Aptomat khối
+
+## Vai trò trong LLM Wiki
+
+Trang này là entity tri thức của vật tư **Attomat**.
+
+Entity này giúp hệ thống:
+
+- Tra cứu lại thông tin định giá
+- Giải thích nguồn dữ liệu
+- Liên kết với concept nghiệp vụ
+- Hỗ trợ AI Agent sử dụng lại tri thức trong các lần định giá sau
+
+## Liên kết concept
+
+- [[Giá tham chiếu]]
+- [[Nguồn dữ liệu]]
+- [[Quy tắc chọn giá]]
+- [[Vật tư tương tự]]
+- [[Second Brain]]
+
+## Ghi chú đồng bộ
+
+Trang được sinh tự động từ PostgreSQL thông qua LLM Wiki Framework.

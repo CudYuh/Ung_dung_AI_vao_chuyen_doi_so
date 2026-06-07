@@ -1,0 +1,45 @@
+# Ghế làm việc
+
+## Thông tin định giá
+
+- ID database: 1814.0
+- Tên hàng hóa: Ghế làm việc
+- Loại hàng hóa: Chưa xác định
+- Đơn vị tính: Cái
+- Giá thẩm định: 1.980.000 VND
+- Ngày thẩm định: 18/12/2025
+- Chứng thư thẩm định: 405/2025/392/CTTĐG-VNVIC
+- Nguồn dữ liệu: …
+- Người thẩm định: Bùi Thị Trà Giang
+
+## Thông số kỹ thuật
+
+GL212
+Ghế làm việc
+Mã hàng: GL212. Hãng sản xuất: The one. Xuất xứ: Việt Nam
+Kích thước: W580 x D640 x H1020 - 1100 mm
+Dung sai kích thước: ± 20 (mm)
+Vật liệu: Ghế có khung thép bọc da công nghiệp, tay mạ sáng bóng, chân mạ có bánh xe di chuyển. Ghế có bộ piston khí nén có thể điều chỉnh được độ cao thấp.
+
+## Vai trò trong LLM Wiki
+
+Trang này là entity tri thức của vật tư **Ghế làm việc**.
+
+Entity này giúp hệ thống:
+
+- Tra cứu lại thông tin định giá
+- Giải thích nguồn dữ liệu
+- Liên kết với concept nghiệp vụ
+- Hỗ trợ AI Agent sử dụng lại tri thức trong các lần định giá sau
+
+## Liên kết concept
+
+- [[Giá tham chiếu]]
+- [[Nguồn dữ liệu]]
+- [[Quy tắc chọn giá]]
+- [[Vật tư tương tự]]
+- [[Second Brain]]
+
+## Ghi chú đồng bộ
+
+Trang được sinh tự động từ PostgreSQL thông qua LLM Wiki Framework.

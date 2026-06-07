@@ -1,0 +1,49 @@
+# Máy hấp khăn
+
+## Thông tin định giá
+
+- ID database: 1006.0
+- Tên hàng hóa: Máy hấp khăn
+- Loại hàng hóa: Chưa xác định
+- Đơn vị tính: Cái
+- Giá thẩm định: 9.000.000 VND
+- Ngày thẩm định: 16/12/2025
+- Chứng thư thẩm định: 405/2025/252/CTTĐG-VNVIC
+- Nguồn dữ liệu: …
+- Người thẩm định: Bùi Thị Trà Giang
+
+## Thông số kỹ thuật
+
+Tủ hấp khăn 
+Kích thước (dài x rộng x cao): 710x600x1450
+Điện áp: 220V/50Hz – 380V/60Hz
+Công suất: 6 Kw đến 10Kw
+Số khay: 8 Khay
+Dạng khay: Khay phẳng/ khay lỗ
+Kích thước khay: 400x 600X 50mm
+Chất liệu chính: Inox 201 (hoặc Inox 304)
+Nhiên liệu:  Điện
+Nhiệt độ: 50 – 100 độ C
+
+## Vai trò trong LLM Wiki
+
+Trang này là entity tri thức của vật tư **Máy hấp khăn**.
+
+Entity này giúp hệ thống:
+
+- Tra cứu lại thông tin định giá
+- Giải thích nguồn dữ liệu
+- Liên kết với concept nghiệp vụ
+- Hỗ trợ AI Agent sử dụng lại tri thức trong các lần định giá sau
+
+## Liên kết concept
+
+- [[Giá tham chiếu]]
+- [[Nguồn dữ liệu]]
+- [[Quy tắc chọn giá]]
+- [[Vật tư tương tự]]
+- [[Second Brain]]
+
+## Ghi chú đồng bộ
+
+Trang được sinh tự động từ PostgreSQL thông qua LLM Wiki Framework.

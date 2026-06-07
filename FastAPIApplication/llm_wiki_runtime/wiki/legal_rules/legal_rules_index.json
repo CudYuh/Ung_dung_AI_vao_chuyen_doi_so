@@ -1,0 +1,154 @@
+{
+  "updated_at": "2026-06-06T01:56:04.030597",
+  "document_count": 5,
+  "rule_count": 7,
+  "documents": [
+    {
+      "id": "luat_gia_2023",
+      "title": "Luật Giá số 16/2023/QH15",
+      "type": "Luật",
+      "issuer": "Quốc hội",
+      "issued_date": "19/06/2023",
+      "effective_date": "01/07/2024",
+      "source_url": "https://vanban.chinhphu.vn/?docid=208367&pageid=27160",
+      "summary": "Luật Giá là cơ sở pháp lý nền tảng về quản lý giá, thẩm định giá, cơ sở dữ liệu về giá, hoạt động phân tích, dự báo giá thị trường và quản lý nhà nước trong lĩnh vực giá.",
+      "applicable_to_system": [
+        "Xác định nguyên tắc hệ thống không được tự ý bịa giá khi thiếu căn cứ.",
+        "Yêu cầu dữ liệu giá và căn cứ định giá phải có khả năng lưu vết.",
+        "Hỗ trợ xây dựng cơ sở dữ liệu giá và kho tri thức phục vụ định giá."
+      ]
+    },
+    {
+      "id": "nghi_dinh_78_2024",
+      "title": "Nghị định 78/2024/NĐ-CP",
+      "type": "Nghị định",
+      "issuer": "Chính phủ",
+      "issued_date": "01/07/2024",
+      "effective_date": "01/07/2024",
+      "source_url": "https://vanban.chinhphu.vn/?docid=210548&pageid=27160",
+      "summary": "Nghị định quy định chi tiết một số điều của Luật Giá về thẩm định giá, liên quan đến hoạt động thẩm định giá, điều kiện, hồ sơ và trách nhiệm của các chủ thể tham gia.",
+      "applicable_to_system": [
+        "Hệ thống cần lưu lại thông tin người thẩm định/phê duyệt và chứng thư.",
+        "Dữ liệu sau khi phê duyệt phải được quản lý rõ ràng trong database.",
+        "Các kết quả AI chỉ là hỗ trợ tham khảo, cần có bước phê duyệt."
+      ]
+    },
+    {
+      "id": "thong_tu_30_2024",
+      "title": "Thông tư 30/2024/TT-BTC",
+      "type": "Thông tư",
+      "issuer": "Bộ Tài chính",
+      "issued_date": "16/05/2024",
+      "effective_date": "01/07/2024",
+      "source_url": "https://chinhphu.vn/?classid=1&docid=210415&pageid=27160",
+      "summary": "Thông tư ban hành các chuẩn mực thẩm định giá Việt Nam về quy tắc đạo đức nghề nghiệp, phạm vi công việc, cơ sở giá trị thẩm định giá và hồ sơ thẩm định giá.",
+      "applicable_to_system": [
+        "Kết quả định giá phải có căn cứ, phạm vi và nguồn dữ liệu rõ ràng.",
+        "Không được trình bày kết quả AI như kết luận thẩm định chính thức nếu chưa được phê duyệt.",
+        "Sau khi phê duyệt, hệ thống cần lưu hồ sơ gồm giá, căn cứ, nguồn, ngày và người phê duyệt."
+      ]
+    },
+    {
+      "id": "thong_tu_31_2024",
+      "title": "Thông tư 31/2024/TT-BTC",
+      "type": "Thông tư",
+      "issuer": "Bộ Tài chính",
+      "issued_date": "16/05/2024",
+      "effective_date": "01/07/2024",
+      "source_url": "https://thuvienphapluat.vn/van-ban/Tai-chinh-nha-nuoc/Thong-tu-31-2024-TT-BTC-Chuan-muc-tham-dinh-gia-Thu-thap-thong-tin-tai-san-tham-dinh-gia-612479.aspx",
+      "summary": "Thông tư ban hành chuẩn mực về thu thập và phân tích thông tin về tài sản thẩm định giá.",
+      "applicable_to_system": [
+        "AI phải thu thập và phân tích thông tin từ nhiều nguồn trước khi đề xuất giá.",
+        "Nguồn dữ liệu cần được phân loại: database nội bộ, kho tri thức, Internet, nguồn tham khảo.",
+        "Nếu thông tin mơ hồ hoặc thiếu thông số, AI phải nêu rõ giả định."
+      ]
+    },
+    {
+      "id": "thong_tu_32_2024",
+      "title": "Thông tư 32/2024/TT-BTC",
+      "type": "Thông tư",
+      "issuer": "Bộ Tài chính",
+      "issued_date": "16/05/2024",
+      "effective_date": "01/07/2024",
+      "source_url": "https://chinhphu.vn/?classid=1&docid=210428&pageid=27160",
+      "summary": "Thông tư ban hành các chuẩn mực thẩm định giá Việt Nam về cách tiếp cận từ thị trường, cách tiếp cận từ chi phí và cách tiếp cận từ thu nhập.",
+      "applicable_to_system": [
+        "Với vật tư, thiết bị, hàng hóa phổ thông, ưu tiên cách tiếp cận từ thị trường.",
+        "Khi có nhiều báo giá tham khảo, AI cần so sánh, chọn nguồn phù hợp và nêu độ tin cậy.",
+        "Nếu thiếu dữ liệu thị trường, AI không được tự bịa giá."
+      ]
+    }
+  ],
+  "ai_valuation_rules": [
+    {
+      "id": "rule_001_no_fake_price",
+      "title": "Không bịa giá khi thiếu dữ liệu",
+      "priority": "critical",
+      "rule": "Nếu không có giá cụ thể từ database nội bộ, kho tri thức, hoặc nguồn Internet đáng tin cậy, AI phải trả về 'Không đủ dữ liệu định giá', không được tự tạo ra mức giá.",
+      "legal_basis": [
+        "Luật Giá số 16/2023/QH15",
+        "Thông tư 30/2024/TT-BTC",
+        "Thông tư 31/2024/TT-BTC"
+      ]
+    },
+    {
+      "id": "rule_002_internal_data_first",
+      "title": "Ưu tiên dữ liệu nội bộ đã thẩm định",
+      "priority": "high",
+      "rule": "Khi database nội bộ hoặc LLM Wiki có dữ liệu tương tự đã được thẩm định, AI phải ưu tiên dữ liệu này trước khi sử dụng dữ liệu Internet.",
+      "legal_basis": [
+        "Luật Giá số 16/2023/QH15",
+        "Thông tư 30/2024/TT-BTC"
+      ]
+    },
+    {
+      "id": "rule_003_market_approach",
+      "title": "Ưu tiên cách tiếp cận từ thị trường với hàng hóa phổ thông",
+      "priority": "high",
+      "rule": "Với vật tư, thiết bị, hàng hóa, xe, máy móc phổ thông, AI cần ưu tiên cách tiếp cận từ thị trường: so sánh giá từ database, vật tư tương tự, báo giá đại lý, sàn thương mại điện tử hoặc nguồn bán hàng đáng tin cậy.",
+      "legal_basis": [
+        "Thông tư 32/2024/TT-BTC"
+      ]
+    },
+    {
+      "id": "rule_004_state_assumptions",
+      "title": "Phải nêu giả định khi truy vấn mơ hồ",
+      "priority": "high",
+      "rule": "Nếu người dùng nhập thiếu thông tin như đời xe, model, cấu hình, tình trạng, dung lượng, phiên bản, AI được phép mở rộng truy vấn nhưng phải ghi rõ giả định trong phần căn cứ.",
+      "legal_basis": [
+        "Thông tư 31/2024/TT-BTC",
+        "Thông tư 30/2024/TT-BTC"
+      ]
+    },
+    {
+      "id": "rule_005_confidence_required",
+      "title": "Bắt buộc có độ tin cậy",
+      "priority": "medium",
+      "rule": "Mọi kết quả định giá phải có độ tin cậy: cao, trung bình hoặc thấp. Độ tin cậy phải dựa trên số lượng nguồn, chất lượng nguồn và mức độ khớp thông số sản phẩm.",
+      "legal_basis": [
+        "Thông tư 30/2024/TT-BTC",
+        "Thông tư 31/2024/TT-BTC"
+      ]
+    },
+    {
+      "id": "rule_006_human_approval_required",
+      "title": "AI chỉ hỗ trợ, không thay thế phê duyệt",
+      "priority": "critical",
+      "rule": "Kết quả AI chỉ là tham khảo. Chỉ khi người dùng có thẩm quyền bấm phê duyệt thì kết quả mới được lưu vào database và trở thành dữ liệu tham chiếu cho các lần sau.",
+      "legal_basis": [
+        "Nghị định 78/2024/NĐ-CP",
+        "Thông tư 30/2024/TT-BTC"
+      ]
+    },
+    {
+      "id": "rule_007_record_after_approval",
+      "title": "Lưu hồ sơ sau phê duyệt",
+      "priority": "high",
+      "rule": "Sau khi phê duyệt, hệ thống phải lưu lại tên tài sản, giá phê duyệt, căn cứ, nguồn dữ liệu, ngày phê duyệt, người phê duyệt và đồng bộ vào LLM Wiki để tái sử dụng.",
+      "legal_basis": [
+        "Luật Giá số 16/2023/QH15",
+        "Thông tư 30/2024/TT-BTC"
+      ]
+    }
+  ]
+}

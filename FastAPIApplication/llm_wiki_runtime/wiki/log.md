@@ -1,0 +1,83 @@
+# Log LLM Wiki
+
+- 26/05/2026 00:37:07 — Rebuild toàn bộ LLM Wiki từ database: 1887 vật tư, 22622 edges, bỏ qua 2 dòng lỗi.
+- 26/05/2026 22:33:03 — Sync vật tư mới/cập nhật vào LLM Wiki: logitech g512 gx rgb - ID 1890.0.
+- 27/05/2026 00:16:35 — Sync vật tư mới/cập nhật vào LLM Wiki: ghế  gaming xpanse x3 - ID 1891.0.
+- 28/05/2026 21:38:16 — Sync vật tư mới/cập nhật vào LLM Wiki: Samsung Galaxy S26 Ultra 12GB 256GB - ID 1892.0.
+- 28/05/2026 21:38:20 — Sync vật tư mới/cập nhật vào LLM Wiki: iPad Pro chip M5 11 inch Wifi 256GB - ID 1893.0.
+- 28/05/2026 21:38:26 — Sync vật tư mới/cập nhật vào LLM Wiki: Laptop ASUS Vivobook 14 M1405NAQ-LY010W - ID 1894.0.
+- 28/05/2026 21:38:30 — Sync vật tư mới/cập nhật vào LLM Wiki: MacBook Air M5 13 inch 2026 10CPU 8GPU 16GB 512GB - ID 1895.0.
+- 28/05/2026 21:38:34 — Sync vật tư mới/cập nhật vào LLM Wiki: Tai nghe Bluetooth Apple AirPods 4 - ID 1896.0.
+- 28/05/2026 21:38:44 — Sync vật tư mới/cập nhật vào LLM Wiki: Loa Bluetooth WaveSound Mini - ID 1897.0.
+- 28/05/2026 21:45:46 — Sync vật tư mới/cập nhật vào LLM Wiki: Tai nghe chụp tai chống ồn Apple AirPods Max 2 2026 - ID 1898.0.
+- 28/05/2026 21:45:53 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO Find X9s 12GB 256GB - ID 1899.0.
+- 28/05/2026 21:46:01 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO Reno15 F 5G 8GB 256GB - ID 1900.0.
+- 28/05/2026 21:46:08 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO Find N6 16GB 512GB - ID 1901.0.
+- 28/05/2026 21:52:31 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO Find X8 16GB 512GB - ID 1902.0.
+- 28/05/2026 21:52:42 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO A6 Pro 8GB 256GB - ID 1903.0.
+- 28/05/2026 21:52:49 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO Reno12 5G 12GB 256GB - ID 1904.0.
+- 28/05/2026 21:52:57 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO Find X9 16GB 512GB - ID 1905.0.
+- 28/05/2026 21:53:04 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO Reno10 Pro+ 5G 12GB 256GB - ID 1906.0.
+- 28/05/2026 21:53:11 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO A3 8GB 256GB - ID 1907.0.
+- 28/05/2026 21:53:29 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO Reno12 F 5G 8GB 256GB - ID 1908.0.
+- 28/05/2026 21:53:42 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO A6t 6GB 256GB - ID 1909.0.
+- 28/05/2026 21:54:00 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO Reno14 5G 12GB 256GB - ID 1910.0.
+- 28/05/2026 21:54:21 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO A6 Pro 8GB 128GB - ID 1911.0.
+- 28/05/2026 21:54:32 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO Find N3 16GB 512GB - ID 1912.0.
+- 28/05/2026 21:54:51 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO A3X 6GB 128GB - ID 1913.0.
+- 28/05/2026 21:55:03 — Sync vật tư mới/cập nhật vào LLM Wiki: OPPO Find X5 Pro 5G 12GB 256GB - ID 1914.0.
+- 28/05/2026 22:21:22 — Sync vật tư mới/cập nhật vào LLM Wiki: Xiaomi POCO F8 Pro 5G 12GB 256GB - ID 1915.0.
+- 28/05/2026 22:28:28 — Sync vật tư mới/cập nhật vào LLM Wiki: Xiaomi Redmi Note 15 5G 6GB 128GB - ID 1916.0.
+- 28/05/2026 22:55:37 — Sync vật tư mới/cập nhật vào LLM Wiki: Xiaomi Redmi Note 15 Pro 12GB 256GB - ID 1917.0.
+- 28/05/2026 23:05:14 — Sync vật tư mới/cập nhật vào LLM Wiki: VinFast VF 6 - ID 1918.0.
+- 28/05/2026 23:16:07 — Sync vật tư mới/cập nhật vào LLM Wiki: VinFast Limo Green - ID 1919.0.
+- 29/05/2026 00:31:19 — Sync vật tư mới/cập nhật vào LLM Wiki: VinFast VF 3 - ID 1920.0.
+- 29/05/2026 00:31:22 — Sync vật tư mới/cập nhật vào LLM Wiki: Toyota Yaris Cross - ID 1921.0.
+- 29/05/2026 00:31:23 — Sync vật tư mới/cập nhật vào LLM Wiki: VinFast VF 5 - ID 1922.0.
+- 29/05/2026 00:31:24 — Sync vật tư mới/cập nhật vào LLM Wiki: VinFast Minio Green - ID 1923.0.
+- 29/05/2026 00:31:27 — Sync vật tư mới/cập nhật vào LLM Wiki: Mitsubishi Xpander - ID 1924.0.
+- 29/05/2026 16:55:48 — Sync vật tư mới/cập nhật vào LLM Wiki: Xiaomi Redmi Note 15 Pro 5G 12GB 256GB - ID 1925.0.
+- 29/05/2026 16:55:50 — Sync vật tư mới/cập nhật vào LLM Wiki: Xiaomi 15 5G 12GB 256GB - ID 1926.0.
+- 29/05/2026 16:55:52 — Sync vật tư mới/cập nhật vào LLM Wiki: Xiaomi 15 Ultra 5G 16GB 512GB - ID 1927.0.
+- 29/05/2026 16:55:53 — Sync vật tư mới/cập nhật vào LLM Wiki: Xiaomi Redmi 15 5G 8GB 256GB - ID 1928.0.
+- 29/05/2026 16:55:56 — Sync vật tư mới/cập nhật vào LLM Wiki: Xiaomi 15 5G 12GB 512GB - ID 1929.0.
+- 31/05/2026 14:29:34 — Sync vật tư mới/cập nhật vào LLM Wiki: Smart Tivi Samsung UHD 4K 43 inch 2024 - ID 1930.0.
+- 31/05/2026 16:07:19 — Sync vật tư mới/cập nhật vào LLM Wiki: Pin dự phòng Apple iPhone Air Magsafe chính hãng - ID 1931.0.
+- 31/05/2026 16:07:26 — Sync vật tư mới/cập nhật vào LLM Wiki: Quạt làm mát không khí hơi nước Fujihome AC-05 - ID 1932.0.
+- 31/05/2026 16:07:31 — Sync vật tư mới/cập nhật vào LLM Wiki: Chuột Apple Magic Mouse 3 2024 - ID 1933.0.
+- 31/05/2026 16:07:35 — Sync vật tư mới/cập nhật vào LLM Wiki: Đồng hồ thông minh Huawei Watch Fit 5 Pro - ID 1934.0.
+- 31/05/2026 16:07:41 — Sync vật tư mới/cập nhật vào LLM Wiki: Đồng hồ thông minh Huawei Watch Fit 4 - ID 1935.0.
+- 31/05/2026 16:07:44 — Sync vật tư mới/cập nhật vào LLM Wiki: Đồng hồ thông minh Samsung Galaxy Watch Ultra 2025 - ID 1936.0.
+- 31/05/2026 16:15:03 — Sync vật tư mới/cập nhật vào LLM Wiki: Honda SH 160i 2025 - ID 1937.0.
+- 31/05/2026 16:15:07 — Sync vật tư mới/cập nhật vào LLM Wiki: Honda Air Blade 160 2025 - ID 1938.0.
+- 31/05/2026 16:15:11 — Sync vật tư mới/cập nhật vào LLM Wiki: Honda Vision 2025 - ID 1939.0.
+- 31/05/2026 16:15:18 — Sync vật tư mới/cập nhật vào LLM Wiki: Yamaha PG-1 2025 - ID 1940.0.
+- 31/05/2026 16:15:25 — Sync vật tư mới/cập nhật vào LLM Wiki: Yamaha Grande 2025 - ID 1941.0.
+- 31/05/2026 16:15:32 — Sync vật tư mới/cập nhật vào LLM Wiki: Yamaha Exciter 155 VVA 2025 - ID 1942.0.
+- 31/05/2026 16:15:38 — Sync vật tư mới/cập nhật vào LLM Wiki: VinFast Evo200 - ID 1943.0.
+- 31/05/2026 16:15:42 — Sync vật tư mới/cập nhật vào LLM Wiki: VinFast Klara S2 - ID 1944.0.
+- 31/05/2026 16:15:45 — Sync vật tư mới/cập nhật vào LLM Wiki: Toyota Yaris Cross 2025 - ID 1945.0.
+- 31/05/2026 16:15:53 — Sync vật tư mới/cập nhật vào LLM Wiki: Mitsubishi Xpander 2025 - ID 1946.0.
+- 31/05/2026 16:16:08 — Sync vật tư mới/cập nhật vào LLM Wiki: Toyota Corolla Cross 2025 - ID 1947.0.
+- 31/05/2026 16:16:14 — Sync vật tư mới/cập nhật vào LLM Wiki: Hyundai Accent 2025 - ID 1948.0.
+- 31/05/2026 16:16:18 — Sync vật tư mới/cập nhật vào LLM Wiki: Hyundai Creta 2025 - ID 1949.0.
+- 31/05/2026 16:16:21 — Sync vật tư mới/cập nhật vào LLM Wiki: Kia Sonet 2025 - ID 1950.0.
+- 31/05/2026 16:16:28 — Sync vật tư mới/cập nhật vào LLM Wiki: Kia Seltos 2025 - ID 1951.0.
+- 31/05/2026 16:16:32 — Sync vật tư mới/cập nhật vào LLM Wiki: Ford Ranger 2025 - ID 1952.0.
+- 31/05/2026 16:16:37 — Sync vật tư mới/cập nhật vào LLM Wiki: Mazda CX-5 2025 - ID 1953.0.
+- 01/06/2026 16:23:24 — Sync vật tư mới/cập nhật vào LLM Wiki: Toyota Vios 2025 - ID 1954.0.
+- 01/06/2026 16:43:59 — Sync vật tư mới/cập nhật vào LLM Wiki: Điện thoại - Xiaomi Redmi Note 14 - ID 1955.0.
+- 01/06/2026 16:44:04 — Sync vật tư mới/cập nhật vào LLM Wiki: Điện thoại - Samsung Galaxy S25 - ID 1956.0.
+- 01/06/2026 16:44:07 — Sync vật tư mới/cập nhật vào LLM Wiki: Điện thoại - Apple iPhone 16 - ID 1957.0.
+- 01/06/2026 16:44:13 — Sync vật tư mới/cập nhật vào LLM Wiki: Laptop - Apple MacBook Air M4 - ID 1958.0.
+- 01/06/2026 16:44:17 — Sync vật tư mới/cập nhật vào LLM Wiki: Laptop - ASUS Vivobook 15 - ID 1959.0.
+- 01/06/2026 16:44:21 — Sync vật tư mới/cập nhật vào LLM Wiki: Laptop - Lenovo IdeaPad Slim 5 - ID 1960.0.
+- 01/06/2026 16:44:27 — Sync vật tư mới/cập nhật vào LLM Wiki: Tai nghe - Samsung Galaxy Buds 3 Pro - ID 1961.0.
+- 01/06/2026 16:44:30 — Sync vật tư mới/cập nhật vào LLM Wiki: Tai nghe - Apple AirPods Pro 2 - ID 1962.0.
+- 01/06/2026 16:44:34 — Sync vật tư mới/cập nhật vào LLM Wiki: Đồng hồ thông minh - Apple Watch Series 10 - ID 1963.0.
+- 01/06/2026 16:44:40 — Sync vật tư mới/cập nhật vào LLM Wiki: Đồng hồ thông minh - Xiaomi Watch 2 - ID 1964.0.
+- 01/06/2026 16:44:43 — Sync vật tư mới/cập nhật vào LLM Wiki: Máy tính bảng - Apple iPad Air M3 - ID 1965.0.
+- 01/06/2026 16:44:50 — Sync vật tư mới/cập nhật vào LLM Wiki: Máy tính bảng - Samsung Galaxy Tab S10 FE - ID 1966.0.
+- 01/06/2026 16:44:56 — Sync vật tư mới/cập nhật vào LLM Wiki: TV - LG OLED evo C5 55 inch - ID 1967.0.
+- 01/06/2026 16:45:00 — Sync vật tư mới/cập nhật vào LLM Wiki: Màn hình máy tính - LG UltraGear 27 inch - ID 1968.0.
+- 01/06/2026 16:45:03 — Sync vật tư mới/cập nhật vào LLM Wiki: TV - Samsung Smart TV QLED 55 inch - ID 1969.0.
