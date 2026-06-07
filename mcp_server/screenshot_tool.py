@@ -14,13 +14,15 @@ if str(fastapi_app_dir) not in sys.path:
 mcp_server = fastmcp.FastMCP("Desktop Screenshot Tool")
 
 @mcp_server.tool()
-def take_screenshot(product_name: str) -> str:
+def take_screenshot(product_name: str, url: str = None) -> str:
     """
     Chụp toàn màn hình desktop hiện tại và lưu lại dưới tên sản phẩm.
+    Nếu có url, tự động mở trang web đó trên trình duyệt rồi chụp màn hình.
     """
     try:
         from routers.valuation_api import take_desktop_screenshot_sync
-        path = take_desktop_screenshot_sync(product_name)
+        urls_list = [url] if url else None
+        path = take_desktop_screenshot_sync(product_name, urls=urls_list)
         if path:
             return f"Đã chụp ảnh màn hình thành công và lưu tại: {path}"
         else:

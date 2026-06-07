@@ -521,40 +521,115 @@ Trả về DUY NHẤT một JSON object theo định dạng:
             ),
         }
 
-def take_desktop_screenshot_sync(product_name: str):
-    """Chụp ảnh toàn màn hình desktop (bao gồm taskbar có đồng hồ góc phải)"""
+def take_desktop_screenshot_sync(product_name: str, urls: List[str] = None):
+    """Chụp ảnh toàn màn hình desktop (hoặc các urls tham khảo nếu có)"""
     import pyautogui
     import time
     from datetime import datetime
     from pathlib import Path
     import re
-
-    # Chờ 3 giây để frontend nhận được kết quả và render lên màn hình
-    time.sleep(3)
+    import webbrowser
 
     # Định nghĩa thư mục lưu trữ (gốc dự án)
     save_dir = Path(__file__).resolve().parents[2] / "screenshots"
     save_dir.mkdir(exist_ok=True)
 
-    try:
-        # Chụp màn hình desktop
-        screenshot = pyautogui.screenshot()
+    # Nếu có urls hợp lệ, chụp từng url
+    valid_urls = [u for u in (urls or []) if u and u.startswith("http")]
+    
+    if valid_urls:
+        saved_paths = []
+        for idx, url in enumerate(valid_urls, start=1):
+            try:
+                # Mở URL
+                webbrowser.open(url)
+                
+                # Chờ 6 giây để trình duyệt tải trang
+                time.sleep(6)
+                
+                # Chụp màn hình
+                screenshot = pyautogui.screenshot()
+                
+                # Tạo tên file
+                safe_name = re.sub(r"[^\w\-]", "_", product_name)[:40]
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = f"{safe_name}_ref_{idx}_{timestamp}.png"
+                filepath = save_dir / filename
+                
+                screenshot.save(filepath)
+                saved_paths.append(str(filepath))
+                print(f"Reference screenshot saved: {filename} for {url}")
+                
+                # Đóng tab trình duyệt vừa mở
+                pyautogui.hotkey('ctrl', 'w')
+                time.sleep(1.5)
+            except Exception as e:
+                print(f"Error during reference screenshot for {url}: {e}")
+        return ", ".join(saved_paths)
+    
+    else:
+        # Hành vi mặc định khi không có urls: chờ 3 giây và chụp desktop hiện tại
+        time.sleep(3)
+        try:
+            screenshot = pyautogui.screenshot()
+            safe_name = re.sub(r"[^\w\-]", "_", product_name)[:40]
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{safe_name}_{timestamp}.png"
+            filepath = save_dir / filename
+            
+            screenshot.save(filepath)
+            print(f"Desktop screenshot saved successfully: {filename}")
+            return str(filepath)
+        except Exception as e:
+            print(f"Error during desktop screenshot: {type(e).__name__}")
+            return ""
 
-        # Tạo tên file an toàn dựa trên tên sản phẩm và thời gian
-        safe_name = re.sub(r"[^\w\-]", "_", product_name)[:40]
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{safe_name}_{timestamp}.png"
-        filepath = save_dir / filename
-        
-        # Lưu ảnh
-        screenshot.save(filepath)
-        print(f"Screenshot saved successfully: {filename}")
-        
-        # Thêm log hoặc in ra file để dễ kiểm tra
-        return str(filepath)
-    except Exception as e:
-        print(f"Error during screenshot: {type(e).__name__}")
-        return ""
+
+def take_batch_screenshots_sync(screenshot_jobs: List[Dict[str, str]]):
+    """Chụp ảnh màn hình cho hàng loạt sản phẩm từ file upload (tuần tự)"""
+    import pyautogui
+    import time
+    import webbrowser
+    from datetime import datetime
+    from pathlib import Path
+    import re
+
+    # Định nghĩa thư mục lưu trữ (gốc dự án)
+    save_dir = Path(__file__).resolve().parents[2] / "screenshots"
+    save_dir.mkdir(exist_ok=True)
+
+    for job in screenshot_jobs:
+        product_name = job.get("product_name", "product")
+        url = job.get("url")
+        if not url or not url.startswith("http"):
+            continue
+
+        try:
+            # Mở URL
+            webbrowser.open(url)
+            
+            # Chờ 6 giây để trình duyệt tải xong trang
+            time.sleep(6)
+
+            # Chụp màn hình
+            screenshot = pyautogui.screenshot()
+
+            # Tạo tên file
+            safe_name = re.sub(r"[^\w\-]", "_", product_name)[:40]
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"batch_{safe_name}_{timestamp}.png"
+            filepath = save_dir / filename
+
+            # Lưu ảnh
+            screenshot.save(filepath)
+            print(f"Batch screenshot saved: {filename} for {url}")
+
+            # Đóng tab trình duyệt bằng phím tắt
+            pyautogui.hotkey('ctrl', 'w')
+            time.sleep(1.5)
+
+        except Exception as e:
+            print(f"Error during batch screenshot for {product_name}: {e}")
 
 
 @router.post("/valuate")
@@ -562,7 +637,18 @@ async def valuate_product(request: ValuationRequest, background_tasks: Backgroun
     result = await run_in_threadpool(sync_valuate_product, request)
     
     # Tự động trigger chụp màn hình sau khi có giá
-    background_tasks.add_task(take_desktop_screenshot_sync, request.product_name)
+    urls = []
+    try:
+        val_res = result.get("valuation_result", {})
+        ref_quotes = val_res.get("reference_quotes", [])
+        for q in ref_quotes:
+            url = q.get("url")
+            if url and url.startswith("http"):
+                urls.append(url)
+    except Exception:
+        pass
+        
+    background_tasks.add_task(take_desktop_screenshot_sync, request.product_name, urls)
     
     return result
 
@@ -823,96 +909,127 @@ async def _process_single_product(product_name: str) -> Dict[str, str]:
 
 
 @router.post("/valuate/batch")
-async def valuate_batch(file: UploadFile = File(...)):
+async def valuate_batch(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     try:
-        content = await file.read()
-        try:
-            decoded = content.decode("utf-8-sig")
-        except UnicodeDecodeError:
-            decoded = content.decode("latin-1")
-            
-        reader = csv.reader(io.StringIO(decoded))
+        import pandas as pd
+        import asyncio
         
-        async def iter_csv():
-            import asyncio
-
+        filename = file.filename.lower() if file.filename else ""
+        is_excel = filename.endswith(('.xlsx', '.xls'))
+        
+        content = await file.read()
+        
+        if is_excel:
+            # Đọc Excel bằng Pandas
+            df = pd.read_excel(io.BytesIO(content), header=None)
+            all_data = df.fillna("").values.tolist()
+        else:
+            # Đọc CSV
+            try:
+                decoded = content.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                decoded = content.decode("latin-1")
+            
+            reader = csv.reader(io.StringIO(decoded))
+            all_data = list(reader)
+            
+        if not all_data:
+            return {"status": "error", "message": "File tải lên trống."}
+            
+        headers = [str(x) for x in all_data[0]]
+        rows = all_data[1:]
+        
+        # Tự động phát hiện cột chứa tên sản phẩm
+        product_col_idx = _detect_product_column(headers)
+        
+        # Danh sách lưu các job chụp màn hình
+        screenshot_jobs = []
+        processed_rows = []
+        
+        # Xử lý song song theo batch (3 sản phẩm cùng lúc)
+        BATCH_SIZE = 3
+        for batch_start in range(0, len(rows), BATCH_SIZE):
+            batch_rows = rows[batch_start:batch_start + BATCH_SIZE]
+            
+            tasks = []
+            for row in batch_rows:
+                # Trích xuất tên sản phẩm
+                if product_col_idx < len(row):
+                    product_name = str(row[product_col_idx]).strip()
+                else:
+                    product_name = str(row[0]).strip() if row else ""
+                    
+                if product_name:
+                    tasks.append(_process_single_product(product_name))
+                else:
+                    async def empty_result():
+                        return {"price": "", "link": "", "note": "Bỏ qua vì tên sản phẩm trống"}
+                    tasks.append(empty_result())
+                    
+            # Chạy song song
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Ghi kết quả vào danh sách các dòng đã xử lý
+            for row, result in zip(batch_rows, results):
+                if isinstance(result, Exception):
+                    price, link, note = "", "", "AI không tìm được giá. Vui lòng liên hệ cơ sở, hệ thống buôn bán."
+                else:
+                    price = result.get("price", "")
+                    link = result.get("link", "")
+                    note = result.get("note", "")
+                    
+                # Thu thập link hợp lệ để chụp màn hình
+                if link and link.startswith("http"):
+                    # Xác định lại tên sản phẩm chính xác
+                    if product_col_idx < len(row):
+                        prod_name = str(row[product_col_idx]).strip()
+                    else:
+                        prod_name = str(row[0]).strip() if row else ""
+                    if not prod_name:
+                        prod_name = "product"
+                    screenshot_jobs.append({"product_name": prod_name, "url": link})
+                    
+                # Định dạng link cho Excel/CSV
+                if link and link.startswith("http"):
+                    excel_link = f'=HYPERLINK("{link}","{link}")'
+                else:
+                    excel_link = link
+                    
+                processed_rows.append(row + [price, excel_link, note])
+                
+        # Thêm tác vụ chụp ảnh màn hình tuần tự vào background task (giới hạn tối đa 30 jobs)
+        if screenshot_jobs and background_tasks:
+            background_tasks.add_task(take_batch_screenshots_sync, screenshot_jobs[:30])
+            
+        output_headers = headers + ["Gia_du_kien", "Link_tham_khao", "Ghi_chu"]
+        
+        if is_excel:
+            # Tạo DataFrame và ghi ra file Excel
+            out_df = pd.DataFrame(processed_rows, columns=output_headers)
+            out_buffer = io.BytesIO()
+            out_df.to_excel(out_buffer, index=False, engine='openpyxl')
+            out_buffer.seek(0)
+            
+            return StreamingResponse(
+                out_buffer,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": "attachment; filename=batch_valuation_result.xlsx"}
+            )
+        else:
+            # Ghi ra file CSV
             output = io.StringIO()
             writer = csv.writer(output)
-            
-            headers = next(reader, None)
-            if headers is None:
-                yield "File CSV trống."
-                return
-            
-            # Tự động phát hiện cột chứa tên sản phẩm
-            product_col_idx = _detect_product_column(headers)
-            
-            # Thêm BOM để Excel đọc được tiếng Việt
-            yield '\ufeff'
-                
-            output_headers = headers + ["Gia_du_kien", "Link_tham_khao", "Ghi_chu"]
+            output.write('\ufeff')  # BOM cho tiếng Việt hiển thị tốt trong Excel
             writer.writerow(output_headers)
-            yield output.getvalue()
+            writer.writerows(processed_rows)
             output.seek(0)
-            output.truncate(0)
-
-            # Thu thập tất cả rows trước
-            all_rows = []
-            for row in reader:
-                if not row or not any(row):
-                    continue
-                all_rows.append(row)
-
-            # Xử lý song song theo batch (3 sản phẩm cùng lúc)
-            BATCH_SIZE = 3
-            for batch_start in range(0, len(all_rows), BATCH_SIZE):
-                batch_rows = all_rows[batch_start:batch_start + BATCH_SIZE]
-
-                # Tạo tasks song song cho batch này
-                tasks = []
-                for row in batch_rows:
-                    if product_col_idx < len(row):
-                        product_name = row[product_col_idx].strip()
-                    else:
-                        product_name = row[0].strip()
-
-                    if product_name:
-                        tasks.append(_process_single_product(product_name))
-                    else:
-                        # Placeholder cho sản phẩm trống
-                        async def empty_result():
-                            return {"price": "", "link": "", "note": "Bỏ qua vì tên sản phẩm trống"}
-                        tasks.append(empty_result())
-
-                # Chạy song song
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                # Ghi kết quả ra CSV
-                for row, result in zip(batch_rows, results):
-                    if isinstance(result, Exception):
-                        price, link, note = "", "", "AI không tìm được giá. Vui lòng liên hệ cơ sở, hệ thống buôn bán."
-                    else:
-                        price = result.get("price", "")
-                        link = result.get("link", "")
-                        note = result.get("note", "")
-
-                    # Wrap link trong công thức HYPERLINK để bấm được trong Excel
-                    if link and link.startswith("http"):
-                        excel_link = f'=HYPERLINK("{link}","{link}")'
-                    else:
-                        excel_link = link
-
-                    writer.writerow(row + [price, excel_link, note])
-                    yield output.getvalue()
-                    output.seek(0)
-                    output.truncate(0)
-
-        return StreamingResponse(
-            iter_csv(),
-            media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=batch_valuation_result.csv"}
-        )
-        
+            
+            return StreamingResponse(
+                io.BytesIO(output.getvalue().encode('utf-8')),
+                media_type="text/csv",
+                headers={"Content-Disposition": "attachment; filename=batch_valuation_result.csv"}
+            )
+            
     except Exception as e:
         return {"status": "error", "message": str(e)}
 

@@ -1,0 +1,11 @@
+{
+  "reference_quotes": [
+    {"description": "Clickbuy - Samsung Galaxy Watch8", "price": "8990000", "url": "https://clickbuy.com.vn/samsung-galaxy-watch8-chinh-hang.html"},
+    {"description": "Phụ Kiện Samsung Giare - Đồng hồ thông minh Samsung Galaxy Watch 8 40mm/44mm", "price": "6990000", "url": "https://phukiensamsunggiare.vn/products/dong-ho-thong-minh-samsung-galaxy-watch-8-40mm-44mm-bluetooth-lte-hang-chinh-hang"}
+  ],
+  "final_price": "6990000",
+  "basis": "căn cứ định giá từ hai nguồn tham khảo khác nhau",
+  "confidence": "cao",
+  "reason": "Dữ liệu được lấy từ các trang web uy tín và có giá cụ thể cho cùng một sản phẩm.",
+  "legal_compliance": ["quy tắc đã tuân thủ"]
+}
