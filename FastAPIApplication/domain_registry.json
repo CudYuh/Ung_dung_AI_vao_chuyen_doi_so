@@ -7,9 +7,20 @@
     "smartphone": {
       "label": "Điện thoại / Smartphone",
       "keywords": [
-        "iphone", "samsung galaxy", "oppo", "xiaomi", "redmi", "poco",
-        "realme", "vivo", "nokia", "google pixel", "oneplus",
-        "dien thoai", "smartphone", "di dong"
+        "iphone",
+        "samsung galaxy",
+        "oppo",
+        "xiaomi",
+        "redmi",
+        "poco",
+        "realme",
+        "vivo",
+        "nokia",
+        "google pixel",
+        "oneplus",
+        "dien thoai",
+        "smartphone",
+        "di dong"
       ],
       "domains": [
         "thegioididong.com",
@@ -17,16 +28,32 @@
         "cellphones.com.vn",
         "didongviet.vn",
         "hoanghamobile.com",
-        "24hstore.vn"
+        "24hstore.vn",
+        "https://clickbuy.com.vn"
       ]
     },
     "laptop": {
       "label": "Laptop / Máy tính xách tay",
       "keywords": [
-        "laptop", "macbook", "thinkpad", "ideapad", "vivobook",
-        "zenbook", "rog", "tuf gaming", "nitro", "aspire",
-        "swift", "inspiron", "latitude", "xps", "pavilion",
-        "elitebook", "probook", "gram", "surface"
+        "laptop",
+        "macbook",
+        "thinkpad",
+        "ideapad",
+        "vivobook",
+        "zenbook",
+        "rog",
+        "tuf gaming",
+        "nitro",
+        "aspire",
+        "swift",
+        "inspiron",
+        "latitude",
+        "xps",
+        "pavilion",
+        "elitebook",
+        "probook",
+        "gram",
+        "surface"
       ],
       "domains": [
         "gearvn.com",
@@ -34,18 +61,39 @@
         "fptshop.com.vn",
         "cellphones.com.vn",
         "phongvu.vn",
-        "anphatpc.com.vn",
-        "nguyenkim.com"
+        "nguyenkim.com",
+        "https://phongvu.vn",
+        "https://hacom.vn",
+        "https://laptopaz.vn"
       ]
     },
     "electronics": {
       "label": "Thiết bị điện tử / Linh kiện",
       "keywords": [
-        "gpu", "vga", "rtx", "gtx", "rx",
-        "cpu", "ram", "ssd", "hdd", "mainboard", "motherboard",
-        "psu", "case", "nguon may tinh", "man hinh",
-        "monitor", "loa", "tai nghe", "headphone", "earbuds",
-        "chuot", "ban phim", "keyboard", "mouse"
+        "gpu",
+        "vga",
+        "rtx",
+        "gtx",
+        "rx",
+        "cpu",
+        "ram",
+        "ssd",
+        "hdd",
+        "mainboard",
+        "motherboard",
+        "psu",
+        "case",
+        "nguon may tinh",
+        "man hinh",
+        "monitor",
+        "loa",
+        "tai nghe",
+        "headphone",
+        "earbuds",
+        "chuot",
+        "ban phim",
+        "keyboard",
+        "mouse"
       ],
       "domains": [
         "gearvn.com",
@@ -62,9 +110,16 @@
     "printer": {
       "label": "Máy in / Thiết bị văn phòng",
       "keywords": [
-        "may in", "printer", "canon lbp", "brother",
-        "epson", "may photocopy", "may scan", "scanner",
-        "may chieu", "projector"
+        "may in",
+        "printer",
+        "canon lbp",
+        "brother",
+        "epson",
+        "may photocopy",
+        "may scan",
+        "scanner",
+        "may chieu",
+        "projector"
       ],
       "domains": [
         "nguyenkim.com",
@@ -79,12 +134,33 @@
     "motorbike": {
       "label": "Xe máy / Xe mô tô",
       "keywords": [
-        "xe may", "xe ga", "xe so", "xe mo to",
-        "sh mode", "vision", "air blade", "airblade", "wave",
-        "winner", "exciter", "sirius", "janus", "grande",
-        "lead", "pcx", "sh 125", "sh 150", "sh 160",
-        "vario", "click", "future", "dream",
-        "yamaha nmax", "yamaha nvx", "vespa", "piaggio"
+        "xe may",
+        "xe ga",
+        "xe so",
+        "xe mo to",
+        "sh mode",
+        "vision",
+        "air blade",
+        "airblade",
+        "wave",
+        "winner",
+        "exciter",
+        "sirius",
+        "janus",
+        "grande",
+        "lead",
+        "pcx",
+        "sh 125",
+        "sh 150",
+        "sh 160",
+        "vario",
+        "click",
+        "future",
+        "dream",
+        "yamaha nmax",
+        "yamaha nvx",
+        "vespa",
+        "piaggio"
       ],
       "domains": [
         "honda.com.vn",
@@ -100,20 +176,76 @@
     "car": {
       "label": "Ô tô",
       "keywords": [
-        "toyota", "hyundai", "kia", "mazda", "ford",
-        "mitsubishi", "vinfast", "peugeot", "nissan",
-        "subaru", "volkswagen", "mercedes", "bmw", "audi", "lexus",
-        "vios", "camry", "corolla", "innova", "fortuner", "hilux",
-        "corolla cross", "raize", "veloz", "yaris",
-        "accent", "tucson", "santa fe", "santafe", "creta",
-        "stargazer", "stargazer x",
-        "seltos", "sonet", "sorento", "carnival", "k3", "k5",
-        "cx5", "cx 5", "cx8", "cx 8", "mazda2", "mazda3", "mazda6",
-        "ranger", "everest", "territory", "explorer",
-        "xpander", "outlander", "pajero", "attrage",
-        "fadil", "lux a", "lux sa", "vf5", "vf6", "vf7", "vf8", "vf9",
-        "o to", "oto", "xe hoi", "sedan", "suv", "crossover",
-        "hatchback", "pickup", "xe ban tai"
+        "toyota",
+        "hyundai",
+        "kia",
+        "mazda",
+        "ford",
+        "mitsubishi",
+        "vinfast",
+        "peugeot",
+        "nissan",
+        "subaru",
+        "volkswagen",
+        "mercedes",
+        "bmw",
+        "audi",
+        "lexus",
+        "vios",
+        "camry",
+        "corolla",
+        "innova",
+        "fortuner",
+        "hilux",
+        "corolla cross",
+        "raize",
+        "veloz",
+        "yaris",
+        "accent",
+        "tucson",
+        "santa fe",
+        "santafe",
+        "creta",
+        "stargazer",
+        "stargazer x",
+        "seltos",
+        "sonet",
+        "sorento",
+        "carnival",
+        "k3",
+        "k5",
+        "cx5",
+        "cx 5",
+        "cx8",
+        "cx 8",
+        "mazda2",
+        "mazda3",
+        "mazda6",
+        "ranger",
+        "everest",
+        "territory",
+        "explorer",
+        "xpander",
+        "outlander",
+        "pajero",
+        "attrage",
+        "fadil",
+        "lux a",
+        "lux sa",
+        "vf5",
+        "vf6",
+        "vf7",
+        "vf8",
+        "vf9",
+        "o to",
+        "oto",
+        "xe hoi",
+        "sedan",
+        "suv",
+        "crossover",
+        "hatchback",
+        "pickup",
+        "xe ban tai"
       ],
       "domains": [
         "vinfastauto.com",
@@ -138,10 +270,19 @@
     "air_conditioner": {
       "label": "Điều hòa / Máy lạnh",
       "keywords": [
-        "dieu hoa", "may lanh", "air conditioner",
-        "daikin", "panasonic", "mitsubishi electric",
-        "tu lanh", "may giat", "may say", "may rua bat",
-        "lo vi song", "noi com dien", "quat dieu hoa"
+        "dieu hoa",
+        "may lanh",
+        "air conditioner",
+        "daikin",
+        "panasonic",
+        "mitsubishi electric",
+        "tu lanh",
+        "may giat",
+        "may say",
+        "may rua bat",
+        "lo vi song",
+        "noi com dien",
+        "quat dieu hoa"
       ],
       "domains": [
         "dienmayxanh.com",
@@ -157,9 +298,16 @@
     "camera": {
       "label": "Camera / Thiết bị giám sát",
       "keywords": [
-        "camera", "webcam", "hikvision", "dahua",
-        "camera ip", "camera wifi", "camera giam sat",
-        "camera hanh trinh", "gopro", "dji"
+        "camera",
+        "webcam",
+        "hikvision",
+        "dahua",
+        "camera ip",
+        "camera wifi",
+        "camera giam sat",
+        "camera hanh trinh",
+        "gopro",
+        "dji"
       ],
       "domains": [
         "nguyenkim.com",
@@ -174,9 +322,19 @@
     "furniture": {
       "label": "Nội thất / Bàn ghế",
       "keywords": [
-        "ban lam viec", "ban hoc", "ghe van phong", "ghe xoay",
-        "tu go", "tu sat", "ke sach", "giuong", "nem",
-        "sofa", "ban an", "tu quan ao", "noi that"
+        "ban lam viec",
+        "ban hoc",
+        "ghe van phong",
+        "ghe xoay",
+        "tu go",
+        "tu sat",
+        "ke sach",
+        "giuong",
+        "nem",
+        "sofa",
+        "ban an",
+        "tu quan ao",
+        "noi that"
       ],
       "domains": [
         "nfrn.vn",
@@ -202,6 +360,54 @@
         "fptshop.com.vn",
         "cellphones.com.vn",
         "phongvu.vn"
+      ]
+    },
+    "headphones": {
+      "label": "Tai nghe",
+      "domains": [
+        "https://cellphones.com.vn",
+        "https://fptshop.com.vn",
+        "https://www.thegioididong.com",
+        "https://gearvn.com",
+        "https://phongvu.vn",
+        "https://hacom.vn",
+        "https://phucanh.vn",
+        "https://viettelstore.vn",
+        "https://hanoicomputer.vn"
+      ]
+    },
+    "keyboard": {
+      "label": "Bàn phím",
+      "domains": [
+        "https://gearvn.com",
+        "https://phongvu.vn",
+        "https://hacom.vn",
+        "https://memoryzone.com.vn",
+        "https://xgear.net",
+        "https://cellphones.com.vn",
+        "https://fptshop.com.vn"
+      ]
+    },
+    "mouse": {
+      "label": "Chuột",
+      "domains": [
+        "https://gearvn.com",
+        "https://cellphones.com.vn",
+        "https://fptshop.com.vn",
+        "https://phongvu.vn",
+        "https://hacom.vn",
+        "https://xgear.net"
+      ]
+    },
+    "tablet": {
+      "label": "Máy tính bảng",
+      "domains": [
+        "https://cellphones.com.vn",
+        "https://fptshop.com.vn",
+        "https://www.thegioididong.com",
+        "https://viettelstore.vn",
+        "https://hoanghamobile.com",
+        "https://clickbuy.com.vn"
       ]
     }
   }

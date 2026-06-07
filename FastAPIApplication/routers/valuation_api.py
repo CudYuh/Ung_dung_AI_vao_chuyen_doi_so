@@ -870,13 +870,25 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
                         prod_name = "product"
                     screenshot_jobs.append({"product_name": prod_name, "url": link})
                     
+                # Định dạng giá cho Excel/CSV (luôn hiển thị dấu chấm và căn trái)
+                if price and price not in ("Không đủ dữ liệu", "Không có dữ liệu"):
+                    import re
+                    num_str = re.sub(r'[^\d]', '', price)
+                    if num_str:
+                        formatted = f"{int(num_str):,}".replace(",", ".")
+                        excel_price = f'="{formatted}"'
+                    else:
+                        excel_price = f'="{price}"'
+                else:
+                    excel_price = price
+                    
                 # Định dạng link cho Excel/CSV
                 if link and link.startswith("http"):
                     excel_link = f'=HYPERLINK("{link}","{link}")'
                 else:
                     excel_link = link
                     
-                processed_rows.append(row + [price, excel_link, note])
+                processed_rows.append(row + [excel_price, excel_link, note])
                 
         # Thêm tác vụ chụp ảnh màn hình tuần tự vào background task (giới hạn tối đa 30 jobs)
         if screenshot_jobs and background_tasks:
@@ -911,71 +923,7 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
                 headers={"Content-Disposition": "attachment; filename=batch_valuation_result.csv"}
             )
             
-            output.truncate(0)
 
-            # Thu thập tất cả rows trước
-            all_rows = []
-            for row in reader:
-                if not row or not any(row):
-                    continue
-                all_rows.append(row)
-
-            # Xử lý song song theo batch (3 sản phẩm cùng lúc)
-            BATCH_SIZE = 3
-            for batch_start in range(0, len(all_rows), BATCH_SIZE):
-                batch_rows = all_rows[batch_start:batch_start + BATCH_SIZE]
-
-                # Tạo tasks song song cho batch này
-                tasks = []
-                for row in batch_rows:
-                    if product_col_idx < len(row):
-                        product_name = row[product_col_idx].strip()
-                    else:
-                        product_name = row[0].strip()
-
-                    if product_name:
-                        tasks.append(_process_single_product(product_name))
-                    else:
-                        # Placeholder cho sản phẩm trống
-                        async def empty_result():
-                            return {"price": "", "link": "", "note": "Bỏ qua vì tên sản phẩm trống"}
-                        tasks.append(empty_result())
-
-                # Chạy song song
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                # Ghi kết quả ra CSV
-                for row, result in zip(batch_rows, results):
-                    if isinstance(result, Exception):
-                        price, link, note = "", "", "AI không tìm được giá. Vui lòng liên hệ cơ sở, hệ thống buôn bán."
-                    else:
-                        price = result.get("price", "")
-                        link = result.get("link", "")
-                        note = result.get("note", "")
-
-                    # Ép Excel hiểu giá là Text (tránh việc 879.000 bị biến thành 879 do hiểu nhầm là số thập phân)
-                    if price and price != "Không đủ dữ liệu" and price != "Không có dữ liệu":
-                        excel_price = f'="{price}"'
-                    else:
-                        excel_price = price
-
-                    # Wrap link trong công thức HYPERLINK để bấm được trong Excel
-                    if link and link.startswith("http"):
-                        excel_link = f'=HYPERLINK("{link}","{link}")'
-                    else:
-                        excel_link = link
-
-                    writer.writerow(row + [excel_price, excel_link, note])
-                    yield output.getvalue()
-                    output.seek(0)
-                    output.truncate(0)
-
-        return StreamingResponse(
-            iter_csv(),
-            media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=batch_valuation_result.csv"}
-        )
-        
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
