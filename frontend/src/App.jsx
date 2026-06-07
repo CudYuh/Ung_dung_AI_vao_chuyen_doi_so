@@ -588,69 +588,6 @@ function App() {
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900 border border-slate-800 text-slate-400 text-sm mb-5">
                 <Brain className="w-4 h-4 text-blue-400" />
                 Tích hợp kho tri thức định giá nội bộ
-          <div className="max-w-2xl mx-auto mt-6 text-center animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="inline-flex items-center gap-4 bg-slate-900/40 p-2 pr-5 rounded-2xl border border-slate-800/80 backdrop-blur-sm">
-              <label className={`cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-semibold rounded-xl shadow-[0_0_20px_-5px_rgba(16,185,129,0.4)] hover:shadow-[0_0_25px_-5px_rgba(16,185,129,0.6)] transition-all active:scale-95 ${batchLoading ? 'opacity-70 pointer-events-none' : ''}`}>
-                <FileUp className="w-4 h-4" />
-                Tải lên CSV / Excel định giá
-                <input type="file" accept=".csv, .xlsx, .xls" className="hidden" onChange={handleBatchUpload} disabled={batchLoading} />
-              </label>
-              {batchLoading ? (
-                <span className="text-sm text-slate-300 flex items-center gap-2 font-medium">
-                  <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-                  Đang xử lý hàng loạt...
-                </span>
-              ) : (
-                <span className="text-sm text-slate-500 font-medium">
-                  Hỗ trợ định giá hàng loạt
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-4 pb-24">
-        {error && (
-          <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 mb-8">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            <p>{error}</p>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {products.map((product) => (
-            <div
-              key={product.id}
-              className="group relative bg-slate-900/50 border border-slate-800 hover:border-blue-500/50 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_-20px_rgba(37,99,235,0.2)]"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform duration-300">
-                    <Package className="w-6 h-6" />
-                  </div>
-
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 uppercase tracking-wider">
-                        <Database className="w-3 h-3" />
-                        Database nội bộ
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-400 uppercase tracking-wider">
-                        <Brain className="w-3 h-3" />
-                        Hồ sơ tri thức
-                      </span>
-                    </div>
-
-                    <h3 className="text-xl font-bold text-slate-100 line-clamp-1">
-                      {product.name}
-                    </h3>
-                  </div>
-                </div>
-
-                <span className="text-xs font-mono text-slate-600">
-                  STT: #{product.id}
-                </span>
               </div>
 
               <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-4 bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
@@ -681,18 +618,10 @@ function App() {
 
               <div className="max-w-2xl mx-auto mt-6 text-center animate-in fade-in slide-in-from-bottom-2 duration-500">
                 <div className="inline-flex items-center gap-4 bg-slate-900/40 p-2 pr-5 rounded-2xl border border-slate-800/80 backdrop-blur-sm">
-                  <label
-                    className={`cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-semibold rounded-xl shadow-[0_0_20px_-5px_rgba(16,185,129,0.4)] hover:shadow-[0_0_25px_-5px_rgba(16,185,129,0.6)] transition-all active:scale-95 ${batchLoading ? "opacity-70 pointer-events-none" : ""}`}
-                  >
+                  <label className={`cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-semibold rounded-xl shadow-[0_0_20px_-5px_rgba(16,185,129,0.4)] hover:shadow-[0_0_25px_-5px_rgba(16,185,129,0.6)] transition-all active:scale-95 ${batchLoading ? 'opacity-70 pointer-events-none' : ''}`}>
                     <FileUp className="w-4 h-4" />
-                    Tải lên CSV định giá
-                    <input
-                      type="file"
-                      accept=".csv"
-                      className="hidden"
-                      onChange={handleBatchUpload}
-                      disabled={batchLoading}
-                    />
+                    Tải lên CSV / Excel định giá
+                    <input type="file" accept=".csv, .xlsx, .xls" className="hidden" onChange={handleBatchUpload} disabled={batchLoading} />
                   </label>
                   {batchLoading ? (
                     <span className="text-sm text-slate-300 flex items-center gap-2 font-medium">
