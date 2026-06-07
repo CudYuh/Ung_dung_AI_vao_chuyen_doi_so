@@ -166,15 +166,25 @@ def check_price_consistency(
         if p and p > 0:
             prices.append(p)
 
-    if len(prices) < 2:
+    if len(prices) == 1:
+        return {
+            "consistent": True,
+            "prices": prices,
+            "deviation_pct": 0,
+            "avg_price": prices[0],
+            "status": "single",
+            "suggested_price": prices[0],
+            "message": "Sử dụng 1 nguồn giá duy nhất.",
+        }
+    elif len(prices) == 0:
         return {
             "consistent": False,
             "prices": prices,
             "deviation_pct": 0,
-            "avg_price": prices[0] if prices else 0,
+            "avg_price": 0,
             "status": "insufficient",
-            "suggested_price": prices[0] if prices else None,
-            "message": "Chỉ tìm được 1 nguồn giá, cần ít nhất 2 nguồn để đối chiếu.",
+            "suggested_price": None,
+            "message": "Không tìm được nguồn giá hợp lệ.",
         }
 
     min_p = min(prices)
@@ -270,7 +280,7 @@ def normalize_valuation_result(result: Dict[str, Any]) -> Dict[str, Any]:
 
     normalized_quotes = []
 
-    for quote in reference_quotes[:3]:
+    for quote in reference_quotes[:1]:
         if not isinstance(quote, dict):
             continue
 
@@ -301,6 +311,10 @@ def normalize_valuation_result(result: Dict[str, Any]) -> Dict[str, Any]:
         final_price = f"{_format_vnd(price_check['suggested_price'])}"
         confidence = "cao"
         basis = f"Hai nguồn tham khảo cùng đưa ra mức giá {final_price} VND. {basis}"
+    elif price_check["status"] == "single":
+        final_price = f"{_format_vnd(price_check['suggested_price'])}"
+        confidence = "cao"
+        basis = f"Sử dụng mức giá tham khảo {final_price} VND từ 1 nguồn duy nhất. {basis}"
     elif price_check["status"] == "acceptable":
         # Chênh lệch nhỏ ≤ 20% → lấy trung bình
         final_price = f"{_format_vnd(price_check['suggested_price'])}"
@@ -439,23 +453,21 @@ Các luật và chuẩn mực định giá phải tuân thủ:
 ---
 
 Nhiệm vụ:
-1. Đưa ra mức giá định giá dự kiến bằng VND nếu có đủ dữ liệu.
-2. CHỈ SỬ DỤNG DỮ LIỆU TỪ INTERNET để định giá. TUYỆT ĐỐI KHÔNG dùng dữ liệu nội bộ hay cơ sở dữ liệu.
-3. Với vật tư, thiết bị, hàng hóa phổ thông, ưu tiên cách tiếp cận từ thị trường.
-4. Nếu truy vấn người dùng mơ hồ nhưng vẫn đoán được sản phẩm, phải ghi rõ giả định trong basis.
-5. Nếu thiếu phiên bản, đời máy, cấu hình, tình trạng, phải ghi rõ giả định định giá.
+1. BẮT BUỘC đọc "Tên sản phẩm trên web" từ dữ liệu và so sánh xem có ĐÚNG với sản phẩm cần tìm hay không.
+2. NẾU ĐÚNG SẢN PHẨM:
+   - Đưa ra mức giá định giá dự kiến bằng VND. Ưu tiên lấy "Giá hiện tại (current_price)". Nếu không có, mới lấy "Giá gốc (original_price)".
+3. NẾU SAI SẢN PHẨM (khác dòng máy, phiên bản, là phụ kiện...):
+   - Bỏ qua nguồn đó, TUYỆT ĐỐI KHÔNG lấy giá của nguồn đó.
+4. CHỈ SỬ DỤNG DỮ LIỆU TỪ INTERNET để định giá. TUYỆT ĐỐI KHÔNG dùng dữ liệu nội bộ hay cơ sở dữ liệu.
+5. Nếu truy vấn người dùng mơ hồ nhưng vẫn đoán được sản phẩm, phải ghi rõ giả định trong basis.
 6. KHÔNG ĐƯỢC bịa giá. GIÁ PHẢI CHÍNH XÁC Y HỆT THEO URL, không tự làm tròn.
-7. LẤY GIÁ THỰC TẾ/GIÁ KHUYẾN MÃI: Nếu nguồn thông tin ghi giá gốc (giá niêm yết) và giá sau khi giảm (giá khuyến mãi), bắt buộc phải lấy giá SAU KHI ĐÃ GIẢM GIÁ làm kết quả.
-8. Không được trả final_price rỗng, không được chỉ trả "VND" hoặc "VNĐ".
-9. Nếu không đủ dữ liệu, final_price phải là "Không đủ dữ liệu định giá".
-10. confidence chỉ được là một trong ba giá trị: "cao", "trung bình", "thấp".
-11. legal_compliance phải nêu hệ thống đã tuân thủ quy tắc nào.
-12. SỐ LƯỢNG KẾT QUẢ: ƯU TIÊN CAO NHẤT LÀ TRẢ VỀ ĐÚNG 2 NGUỒN THAM KHẢO GIÁ KHÁC NHAU. Hãy cố gắng hết sức tìm 2 kết quả. Nếu dữ liệu hoàn toàn chỉ có 1 kết quả hợp lệ thì mới được trả về 1.
-13. TIÊU CHÍ CHỌN & CẤM BỊA ĐẶT: 
-   - Chỉ chọn kết quả KHỚP ĐÚNG SẢN PHẨM và BẮT BUỘC PHẢI CÓ CON SỐ GIÁ TIỀN bên trong đoạn văn của kết quả đó.
-   - TUYỆT ĐỐI KHÔNG LẤY GIÁ CỦA SẢN PHẨM NÀY GHÉP CHO SẢN PHẨM KHÁC. Nếu kết quả không ghi giá, BẮT BUỘC BỎ QUA.
-14. CHỈ LẤY GIÁ TỪ TRANG BÁN HÀNG: Chỉ được phép lấy số liệu giá từ các trang bán hàng, siêu thị điện máy, đại lý chính hãng. TUYỆT ĐỐI KHÔNG lấy giá được nhắc tới trong các bài báo, trang tin tức, hoặc trang đánh giá/review (ví dụ: vnexpress.net, dantri.com.vn, tinhte.vn, v.v.). URL của nguồn phải là URL của sản phẩm đang được bán.
-15. URL CHÍNH XÁC: Trường "url" BẮT BUỘC phải là link chi tiết đến tận trang bán sản phẩm đó (giữ nguyên đầy đủ tham số). Tuyệt đối không được tự ý rút gọn URL thành link trang chủ.
+7. Không được trả final_price rỗng, không được chỉ trả "VND" hoặc "VNĐ".
+8. Nếu không đủ dữ liệu, final_price phải là "Không đủ dữ liệu định giá".
+9. confidence chỉ được là một trong ba giá trị: "cao", "trung bình", "thấp".
+10. legal_compliance phải nêu hệ thống đã tuân thủ quy tắc nào.
+11. SỐ LƯỢNG KẾT QUẢ: BẮT BUỘC TRẢ VỀ ĐÚNG 1 NGUỒN THAM KHẢO GIÁ DUY NHẤT. Chọn nguồn có thông tin giá rõ ràng và khớp với sản phẩm nhất.
+12. TIÊU CHÍ CHỌN: Chỉ chọn kết quả KHỚP ĐÚNG SẢN PHẨM và BẮT BUỘC PHẢI CÓ GIÁ. TUYỆT ĐỐI KHÔNG LẤY GIÁ CỦA SẢN PHẨM NÀY GHÉP CHO SẢN PHẨM KHÁC.
+13. URL CHÍNH XÁC: Trường "url" BẮT BUỘC phải là link chi tiết đến tận trang bán sản phẩm đó (giữ nguyên đầy đủ tham số). Tuyệt đối không được tự ý rút gọn URL thành link trang chủ.
 
 Trả về DUY NHẤT một JSON object theo định dạng:
 
@@ -465,11 +477,6 @@ Trả về DUY NHẤT một JSON object theo định dạng:
       "description": "Chỉ ghi TÊN SẢN PHẨM chính xác (ví dụ: iPhone 16 Pro Max 256GB), TUYỆT ĐỐI KHÔNG kèm tên trang web/shop",
       "price": "Mức giá bằng VND, ví dụ: 62.700.000",
       "url": "https://url-chi-tiet-den-tan-trang-san-pham.com (tuyệt đối giữ nguyên link đầy đủ)"
-    }},
-    {{
-      "description": "Chỉ ghi TÊN SẢN PHẨM chính xác, TUYỆT ĐỐI KHÔNG kèm tên trang web/shop",
-      "price": "Mức giá bằng VND, ví dụ: 63.500.000",
-      "url": "https://url-chi-tiet-den-tan-trang-san-pham.com"
     }}
   ],
   "final_price": "Mức giá định giá dự kiến bằng VND hoặc Không đủ dữ liệu định giá",
@@ -896,13 +903,19 @@ async def valuate_batch(file: UploadFile = File(...)):
                         link = result.get("link", "")
                         note = result.get("note", "")
 
+                    # Ép Excel hiểu giá là Text (tránh việc 879.000 bị biến thành 879 do hiểu nhầm là số thập phân)
+                    if price and price != "Không đủ dữ liệu" and price != "Không có dữ liệu":
+                        excel_price = f'="{price}"'
+                    else:
+                        excel_price = price
+
                     # Wrap link trong công thức HYPERLINK để bấm được trong Excel
                     if link and link.startswith("http"):
                         excel_link = f'=HYPERLINK("{link}","{link}")'
                     else:
                         excel_link = link
 
-                    writer.writerow(row + [price, excel_link, note])
+                    writer.writerow(row + [excel_price, excel_link, note])
                     yield output.getvalue()
                     output.seek(0)
                     output.truncate(0)

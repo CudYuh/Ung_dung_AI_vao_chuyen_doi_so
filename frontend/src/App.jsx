@@ -883,64 +883,7 @@ function App() {
 
                         return (
                           <div className="space-y-6">
-                            <div className="bg-gradient-to-r from-violet-600/20 to-indigo-600/20 rounded-xl p-5 border border-violet-500/30">
-                              <h4 className="text-violet-300 font-semibold mb-2">
-                                Giá chốt dự kiến:
-                              </h4>
-
-                              <div className="flex items-center justify-between flex-wrap gap-4">
-                                <span className="text-2xl font-bold text-white">
-                                  {result.final_price}{" "}
-                                  {String(result.final_price)
-                                    .toLowerCase()
-                                    .includes("vnd")
-                                    ? ""
-                                    : "VND"}
-                                </span>
-
-                                <button
-                                  onClick={() =>
-                                    approvePrice(
-                                      result.final_price,
-                                      "AI Valuation",
-                                      result.basis,
-                                    )
-                                  }
-                                  disabled={approving}
-                                  className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
-                                >
-                                  {approving ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Database className="w-4 h-4" />
-                                  )}
-                                  Phê duyệt giá này
-                                </button>
-                              </div>
-
-                              <p className="text-sm text-slate-300 mt-3">
-                                <span className="text-slate-400">Căn cứ:</span>{" "}
-                                {result.basis}
-                              </p>
-
-                              <div className="flex items-center gap-2 mt-3 text-xs">
-                                <span
-                                  className={`px-2 py-1 rounded bg-slate-800 ${
-                                    result.confidence === "cao"
-                                      ? "text-emerald-400"
-                                      : result.confidence === "trung bình"
-                                        ? "text-amber-400"
-                                        : "text-red-400"
-                                  }`}
-                                >
-                                  Độ tin cậy: {result.confidence}
-                                </span>
-                                <span className="text-slate-500">
-                                  {result.reason}
-                                </span>
-                              </div>
-                            </div>
-
+                            {/* Removed Giá chốt dự kiến block as per user request */}
                             {result.reference_quotes &&
                               result.reference_quotes.length > 0 && (
                                 <div>
