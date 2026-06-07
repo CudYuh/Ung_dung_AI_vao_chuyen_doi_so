@@ -61,6 +61,21 @@ MODEL_PATTERNS = [
     r'\b\d+\s*(?:gb|tb)\b', r'\ba\d{4}\b', r'[a-z]{2,}\d{2,}', r'\b\d+(?:\.\d+)?(?:-inch|")\b'
 ]
 
+# Pattern tổng quát nhận diện class CSS chứa giá hiện tại / giá KM
+# Bao phủ: thegioididong, cellphones, fptshop, dienmayxanh, gearvn, hoanghamobile và phần lớn TMĐT VN
+PRICE_CLASS_PATTERN = re.compile(
+    r'<[^>]*class="[^"]*(?:'
+    r'price[_-]?(?:current|sale|now|show|main|final|offer|special|highlight|active|new|box|display)|'
+    r'(?:current|sale|final|offer|special|highlight|active|new|giakm|km|khuyen[_-]?mai|promotion|promo|discount)[_-]?price|'
+    r'gia[_-]?(?:ban|km|khuyen[_-]?mai|hien[_-]?tai|sale)|'
+    r'tpt__current[_-]?price|box[_-]?price|price[_-]?box'
+    r')[^"]*"[^>]*>(.*?)</[^>]+>',
+    re.IGNORECASE | re.DOTALL
+)
+
+# Pattern nhận diện nút mua hàng để dùng anchor fallback
+BUY_BUTTON_TEXTS = ["mua ngay", "thêm vào giỏ", "add to cart", "mua hàng", "đặt mua", "order now", "buy now"]
+
 def detect_category(query: str) -> str:
     q = query.lower()
     for cat, kw_list in CATEGORY_KEYWORDS.items():
@@ -253,6 +268,38 @@ def count_product_items(html: str) -> int:
         total += len(re.findall(pat, html, re.I))
     return total
 
+def extract_price_near_buy_button(soup: BeautifulSoup, price_pattern: str) -> str:
+    """
+    P2 Fallback: Tìm vùng HTML gần nút 'Mua ngay'/'Add to cart',
+    sau đó trích xuất giá trong cùng container cha.
+    Logic: giá thật luôn nằm gần nút mua hàng nhất.
+    """
+    for text in BUY_BUTTON_TEXTS:
+        btn = soup.find(
+            lambda tag: tag.name in ["button", "a", "span", "div"]
+            and text in (tag.get_text(separator=" ") or "").lower()
+        )
+        if not btn:
+            continue
+        # Đi lên tối đa 4 cấp parent để tìm container chứa giá
+        container = btn
+        for _ in range(4):
+            parent = container.parent
+            if parent is None:
+                break
+            container = parent
+            container_html = str(container)
+            prices = re.findall(price_pattern, container_html, re.IGNORECASE)
+            if prices:
+                # Lấy giá đầu tiên trong container (gần nút mua = giá thật)
+                numeric = [(int(re.sub(r'[^\d]', '', p)), p) for p in prices if int(re.sub(r'[^\d]', '', p) or '0') >= 50000]
+                if numeric:
+                    numeric.sort(key=lambda x: x[0])
+                    # Lấy giá nhỏ nhất hợp lệ trong vùng nút mua (= giá sale sau KM)
+                    return numeric[0][1]
+    return ""
+
+
 def check_link_alive(url: str, product_name: str, content: str = "", timeout: int = 15) -> Dict:
     result = {"url": url, "shop": urlparse(url).netloc.lower().replace("www.", ""), "name": product_name, "score": -999, "content": content}
     try:
@@ -272,21 +319,61 @@ def check_link_alive(url: str, product_name: str, content: str = "", timeout: in
         base_fallback_score = 30 if not html else 0
         soup = BeautifulSoup(html, "html.parser")
 
-        # TRÍCH XUẤT GIÁ TỪ SCHEMA.ORG NẾU CÓ
+        # ═══ TẦNG 1: SCHEMA.ORG JSON-LD (nguồn tin cậy nhất) ═══
         schema_price = ""
+        schema_original_price = ""
         for script in soup.find_all("script", type="application/ld+json"):
             try:
                 data = json.loads(script.string)
                 items = data if isinstance(data, list) else [data]
                 for item in items:
-                    if isinstance(item, dict) and (item.get("@type") == "Product" or item.get("type") == "Product"):
+                    if not isinstance(item, dict):
+                        continue
+                    if item.get("@type") == "Product" or item.get("type") == "Product":
                         offers = item.get("offers")
-                        if isinstance(offers, dict) and offers.get("price"):
-                            schema_price = str(offers.get("price"))
+                        offer_obj = None
+                        if isinstance(offers, dict):
+                            offer_obj = offers
                         elif isinstance(offers, list) and len(offers) > 0 and isinstance(offers[0], dict):
-                            schema_price = str(offers[0].get("price", ""))
+                            offer_obj = offers[0]
+                        if offer_obj:
+                            # Ưu tiên: lowPrice / price (giá sale) > highPrice (giá gốc)
+                            raw_price = offer_obj.get("lowPrice") or offer_obj.get("price")
+                            raw_original = offer_obj.get("highPrice") or offer_obj.get("originalPrice")
+                            if raw_price:
+                                schema_price = str(raw_price)
+                            if raw_original:
+                                schema_original_price = str(raw_original)
+                        if schema_price:
+                            break  # Tìm được rồi, dừng
             except:
                 pass
+
+        # ═══ TẦNG 2: DATA ATTRIBUTES & META TAGS (nguồn tin cậy cao) ═══
+        data_attr_price = ""
+        # 2a. data-price / data-sale-price / data-final-price... trên các element
+        data_price_match = re.search(
+            r'data-(?:sale[_-]?price|final[_-]?price|current[_-]?price|offer[_-]?price|price(?!-[a-z])'
+            r')["\s]*=["\s]*["\']?([\d][\d.,]+)["\']?',
+            html, re.IGNORECASE
+        )
+        if data_price_match:
+            raw_val = re.sub(r'[^\d]', '', data_price_match.group(1))
+            if raw_val and int(raw_val) >= 1000:  # lọc số quá nhỏ
+                data_attr_price = data_price_match.group(1)
+
+        # 2b. <meta property="product:price:amount" content="..."> (Open Graph)
+        og_price_match = re.search(
+            r'<meta[^>]*property=["\'](?:product:price:amount|og:price:amount)["\'][^>]*content=["\']([^"\'>]+)["\']',
+            html, re.IGNORECASE
+        ) or re.search(
+            r'<meta[^>]*content=["\']([^"\'>]+)["\'][^>]*property=["\'](?:product:price:amount|og:price:amount)["\']',
+            html, re.IGNORECASE
+        )
+        if og_price_match and not data_attr_price:
+            raw_val = re.sub(r'[^\d]', '', og_price_match.group(1))
+            if raw_val and int(raw_val) >= 1000:
+                data_attr_price = og_price_match.group(1)
 
         normalized_query = normalize_text(product_name)
         specific = has_specific_model(product_name)
@@ -382,30 +469,40 @@ def check_link_alive(url: str, product_name: str, content: str = "", timeout: in
                 result["score"] = -100
                 return result
 
-        # 2. Prices
+        # ═══ TẦNG 3: REGEX TRÊN HTML (price_pattern) ═══
+        # Pattern nhận dạng giá có đơn vị (VND, đ, ₫...) — dùng xuyên suốt các bước
         price_pattern = r'((?:\d{1,3}[.,])+\d{3})\s*(?:đ|vnđ|vnd|₫|đồng)'
         original_price = ""
         current_price = ""
 
-        # Original price: <del> or <s>
-        del_matches = re.findall(r'<(?:del|strike|s)[^>]*>(.*?)</(?:del|strike|s)>', html, re.IGNORECASE | re.DOTALL)
+        # 3a. Giá gốc bị gạch ngang: <del>, <strike>, <s>
+        #     Chỉ nhận <del>/<strike> để tránh nhầm với text bị gạch khác dùng <s>
+        del_matches = re.findall(r'<(?:del|strike)[^>]*>(.*?)</(?:del|strike)>', html, re.IGNORECASE | re.DOTALL)
         for dm in del_matches:
             pm = re.search(price_pattern, dm, re.IGNORECASE)
             if pm:
                 original_price = pm.group(1)
                 break
 
-        # Current price: special classes
-        cur_matches = re.findall(r'<[^>]*class="[^"]*(?:special|current|new|giakm|price-main|price)[^"]*"[^>]*>(.*?)</[^>]+>', html, re.IGNORECASE | re.DOTALL)
-        for cm in cur_matches:
-            if '<del' in cm.lower() or '<s' in cm.lower():
+        # 3b. Giá hiện tại: dùng PRICE_CLASS_PATTERN mở rộng (bao phủ ~90% TMĐT VN)
+        for cm in PRICE_CLASS_PATTERN.finditer(html):
+            inner = cm.group(1)
+            # Bỏ qua nếu inner chứa tag giá gốc (bị gạch ngang)
+            if '<del' in inner.lower() or '<strike' in inner.lower():
                 continue
-            pm = re.search(price_pattern, cm, re.IGNORECASE)
+            pm = re.search(price_pattern, inner, re.IGNORECASE)
             if pm:
                 current_price = pm.group(1)
                 break
 
-        # Fallback if not found
+        # ═══ TẦNG 4: ANCHOR FALLBACK (P2) — Tìm giá gần nút mua hàng ═══
+        if not current_price and soup:
+            anchor_price = extract_price_near_buy_button(soup, price_pattern)
+            if anchor_price:
+                current_price = anchor_price
+                logger.debug(f"[AnchorFallback] Found price near buy button: {anchor_price}")
+
+        # ═══ TẦNG 5: FULL-HTML FALLBACK (cải tiến — không dùng trung vị ngẫu nhiên) ═══
         if not current_price or not original_price:
             all_prices = re.findall(price_pattern, html, re.IGNORECASE)
             seen = set()
@@ -414,31 +511,61 @@ def check_link_alive(url: str, product_name: str, content: str = "", timeout: in
                 if p not in seen:
                     unique_prices.append(p)
                     seen.add(p)
-            
+
             if unique_prices:
                 numeric_prices = [(int(re.sub(r'[^\d]', '', p)), p) for p in unique_prices]
-                # Lọc bỏ các giá quá vô lý (như 350đ, hoặc 50.000đ phí ship)
+                # Lọc giá không hợp lý (phí ship, số quá nhỏ)
                 numeric_prices = [np for np in numeric_prices if np[0] >= 50000]
-                numeric_prices.sort(key=lambda x: x[0], reverse=True) # Sort descending
-                
-                # Nguồn fallback thường chứa nhiều giá rác, ưu tiên lấy giá cao (vì giá thấp thường là rác/phụ kiện)
-                if not current_price and numeric_prices:
-                    current_price = numeric_prices[-1][1] if len(numeric_prices) == 1 else numeric_prices[len(numeric_prices)//2][1]
-                if not original_price and len(numeric_prices) > 1:
-                    original_price = numeric_prices[0][1]
+                numeric_prices.sort(key=lambda x: x[0])  # Tăng dần
 
-        # ÉP GIÁ VÀO CONTENT CHO OLLAMA ĐỌC ĐƯỢC CHÍNH XÁC
+                if not current_price and numeric_prices:
+                    # Lấy giá trung bình tối thiểu: bỏ 25% thấp nhất (rác/phụ kiện) và 25% cao nhất (giá niêm yết cũ)
+                    # Lấy giá nhỏ nhất trong 50% giữa → sát giá sale thực tế nhất
+                    lo = len(numeric_prices) // 4
+                    hi = max(lo + 1, len(numeric_prices) - len(numeric_prices) // 4)
+                    mid_prices = numeric_prices[lo:hi]
+                    if mid_prices:
+                        current_price = mid_prices[0][1]  # giá nhỏ nhất trong vùng giữa
+                    else:
+                        current_price = numeric_prices[0][1]  # fallback cuối: giá nhỏ nhất
+
+                if not original_price and len(numeric_prices) > 1:
+                    original_price = numeric_prices[-1][1]  # giá lớn nhất = giá gốc/niêm yết
+
+        # ═══ TỔNG HỢP: ĐẨY GIÁ VÀO CONTENT THEO THỨ TỰ ƯU TIÊN ═══
         extra_info = []
         extra_info.append(f"Tên sản phẩm trên web: {crawled_name}")
-        if current_price:
-            extra_info.append(f"Giá hiện tại (current_price): {current_price} VNĐ")
-        if original_price:
-            extra_info.append(f"Giá gốc (original_price): {original_price} VNĐ")
-            
+
+        # Ưu tiên 1: Schema.org (độ tin cậy cao nhất — dữ liệu có cấu trúc, do dev trang web định nghĩa)
+        if schema_price:
+            extra_info.append(f"Giá hiện tại (current_price): {schema_price} VNĐ [Nguồn: Schema.org LD+JSON]")
+            if schema_original_price:
+                extra_info.append(f"Giá gốc (original_price): {schema_original_price} VNĐ [Nguồn: Schema.org LD+JSON]")
+        # Ưu tiên 2: data attributes / Open Graph meta
+        elif data_attr_price:
+            extra_info.append(f"Giá hiện tại (current_price): {data_attr_price} VNĐ [Nguồn: data-attribute/meta]")
+            if original_price:
+                extra_info.append(f"Giá gốc (original_price): {original_price} VNĐ")
+        # Ưu tiên 3: Regex CSS class / anchor / full-html fallback
+        else:
+            if current_price:
+                extra_info.append(f"Giá hiện tại (current_price): {current_price} VNĐ")
+            if original_price:
+                extra_info.append(f"Giá gốc (original_price): {original_price} VNĐ")
+
+        # raw_content từ Tavily: smart context window — anchor theo vị trí xuất hiện giá
+        raw_content = content  # 'content' là param của hàm (Tavily raw content)
         if raw_content:
-            clean_raw = raw_content[:200].replace('\n', ' ')
-            extra_info.append(f"Nội dung mô tả thêm: {clean_raw}")
-        
+            price_pos = re.search(r'\d{1,3}[.,]\d{3}', raw_content)
+            if price_pos:
+                start = max(0, price_pos.start() - 80)
+                end = min(len(raw_content), price_pos.start() + 400)
+                clean_raw = raw_content[start:end].replace('\n', ' ').strip()
+            else:
+                clean_raw = raw_content[:500].replace('\n', ' ').strip()
+            if clean_raw:
+                extra_info.append(f"Nội dung mô tả thêm (Tavily): {clean_raw}")
+
         if extra_info:
             result["content"] = "\n".join(extra_info)
 
