@@ -61,15 +61,26 @@ MODEL_PATTERNS = [
     r'\b\d+\s*(?:gb|tb)\b', r'\ba\d{4}\b', r'[a-z]{2,}\d{2,}', r'\b\d+(?:\.\d+)?(?:-inch|")\b'
 ]
 
-# Pattern tổng quát nhận diện class CSS chứa giá hiện tại / giá KM
+# Pattern tổng quát nhận diện class, id, itemprop chứa GIÁ HIỆN TẠI / GIÁ KHUYẾN MÃI
 # Bao phủ: thegioididong, cellphones, fptshop, dienmayxanh, gearvn, hoanghamobile và phần lớn TMĐT VN
-PRICE_CLASS_PATTERN = re.compile(
-    r'<[^>]*class="[^"]*(?:'
-    r'price[_-]?(?:current|sale|now|show|main|final|offer|special|highlight|active|new|box|display)|'
-    r'(?:current|sale|final|offer|special|highlight|active|new|giakm|km|khuyen[_-]?mai|promotion|promo|discount)[_-]?price|'
-    r'gia[_-]?(?:ban|km|khuyen[_-]?mai|hien[_-]?tai|sale)|'
-    r'tpt__current[_-]?price|box[_-]?price|price[_-]?box'
-    r')[^"]*"[^>]*>(.*?)</[^>]+>',
+CURRENT_PRICE_CLASS_PATTERN = re.compile(
+    r'<[^>]*(?:class|id|itemprop|data-[a-zA-Z0-9_-]+)=["\'][^"\']*(?:'
+    r'price[_-]?(?:current|sale|now|show|main|final|offer|special|highlight|active|new|box|display|amount|val|value)|'
+    r'(?:current|sale|final|offer|special|highlight|active|new|giakm|km|khuyen[_-]?mai|promotion|promo|discount|item|product)[_-]?price|'
+    r'gia[_-]?(?:ban|km|khuyen[_-]?mai|hien[_-]?tai|sale|tot|soc|moi|chinh[_-]?hang|thuc)|'
+    r'tpt__current[_-]?price|box[_-]?price|price[_-]?box|'
+    r'woocommerce-Price-amount|amount'
+    r')[^"\']*["\'][^>]*>(.*?)</[^>]+>',
+    re.IGNORECASE | re.DOTALL
+)
+
+# Pattern tổng quát nhận diện class, id, itemprop chứa GIÁ GỐC / GIÁ NIÊM YẾT / GIÁ CŨ
+ORIGINAL_PRICE_CLASS_PATTERN = re.compile(
+    r'<[^>]*(?:class|id|itemprop|data-[a-zA-Z0-9_-]+)=["\'][^"\']*(?:'
+    r'price[_-]?(?:old|original|regular|strike|list|base|retail|cu|goc)|'
+    r'(?:old|original|regular|strike|list|base|retail|cu|goc)[_-]?price|'
+    r'gia[_-]?(?:cu|goc|niem[_-]?yet|truoc[_-]?day|thi[_-]?truong)'
+    r')[^"\']*["\'][^>]*>(.*?)</[^>]+>',
     re.IGNORECASE | re.DOTALL
 )
 
@@ -231,7 +242,7 @@ def vietnamese_shop_boost(domain: str, html: str) -> int:
     return boost
 
 def extract_prices(html: str) -> List[str]:
-    pat = r'\d{1,3}(?:[.,]\d{3})*(?:\.\d+)?\s?(?:đ|vnđ|vnd|₫|\$|usd|eur|€|£|¥)'
+    pat = r'\d{1,3}(?:[.,]\d{3})*(?:\.\d+)?\s?(?:đ|vnđ|vnd|₫|\$|usd|eur|€|£|¥|&#8363;|&#x20AB;)'
     matches = re.findall(pat, html.lower())
     unique = {re.sub(r'[^\d.,]', '', m) for m in matches}
     return list(unique)
@@ -341,9 +352,13 @@ def check_link_alive(url: str, product_name: str, content: str = "", timeout: in
                             raw_price = offer_obj.get("lowPrice") or offer_obj.get("price")
                             raw_original = offer_obj.get("highPrice") or offer_obj.get("originalPrice")
                             if raw_price:
-                                schema_price = str(raw_price)
+                                val = re.sub(r'[^\d]', '', str(raw_price))
+                                if val and int(val) >= 50000:
+                                    schema_price = str(raw_price)
                             if raw_original:
-                                schema_original_price = str(raw_original)
+                                val = re.sub(r'[^\d]', '', str(raw_original))
+                                if val and int(val) >= 50000:
+                                    schema_original_price = str(raw_original)
                         if schema_price:
                             break  # Tìm được rồi, dừng
             except:
@@ -353,13 +368,13 @@ def check_link_alive(url: str, product_name: str, content: str = "", timeout: in
         data_attr_price = ""
         # 2a. data-price / data-sale-price / data-final-price... trên các element
         data_price_match = re.search(
-            r'data-(?:sale[_-]?price|final[_-]?price|current[_-]?price|offer[_-]?price|price(?!-[a-z])'
+            r'data-(?:sale[_-]?price|final[_-]?price|current[_-]?price|offer[_-]?price|price(?!-[a-z])|giaban|giakm|giasale'
             r')["\s]*=["\s]*["\']?([\d][\d.,]+)["\']?',
             html, re.IGNORECASE
         )
         if data_price_match:
             raw_val = re.sub(r'[^\d]', '', data_price_match.group(1))
-            if raw_val and int(raw_val) >= 1000:  # lọc số quá nhỏ
+            if raw_val and int(raw_val) >= 50000:  # lọc số quá nhỏ (thiếu số 0)
                 data_attr_price = data_price_match.group(1)
 
         # 2b. <meta property="product:price:amount" content="..."> (Open Graph)
@@ -372,7 +387,7 @@ def check_link_alive(url: str, product_name: str, content: str = "", timeout: in
         )
         if og_price_match and not data_attr_price:
             raw_val = re.sub(r'[^\d]', '', og_price_match.group(1))
-            if raw_val and int(raw_val) >= 1000:
+            if raw_val and int(raw_val) >= 50000:
                 data_attr_price = og_price_match.group(1)
 
         normalized_query = normalize_text(product_name)
@@ -471,7 +486,7 @@ def check_link_alive(url: str, product_name: str, content: str = "", timeout: in
 
         # ═══ TẦNG 3: REGEX TRÊN HTML (price_pattern) ═══
         # Pattern nhận dạng giá có đơn vị (VND, đ, ₫...) — dùng xuyên suốt các bước
-        price_pattern = r'((?:\d{1,3}[.,])+\d{3})\s*(?:đ|vnđ|vnd|₫|đồng)'
+        price_pattern = r'((?:\d{1,3}[.,])+\d{3})\s*(?:đ|vnđ|vnd|₫|đồng|&#8363;|&#x20AB;)'
         original_price = ""
         current_price = ""
 
@@ -481,19 +496,34 @@ def check_link_alive(url: str, product_name: str, content: str = "", timeout: in
         for dm in del_matches:
             pm = re.search(price_pattern, dm, re.IGNORECASE)
             if pm:
-                original_price = pm.group(1)
-                break
+                val = re.sub(r'[^\d]', '', pm.group(1))
+                if val and int(val) >= 50000:
+                    original_price = pm.group(1)
+                    break
 
-        # 3b. Giá hiện tại: dùng PRICE_CLASS_PATTERN mở rộng (bao phủ ~90% TMĐT VN)
-        for cm in PRICE_CLASS_PATTERN.finditer(html):
+        # 3b. Giá hiện tại: dùng CURRENT_PRICE_CLASS_PATTERN mở rộng (bao phủ ~90% TMĐT VN)
+        for cm in CURRENT_PRICE_CLASS_PATTERN.finditer(html):
             inner = cm.group(1)
             # Bỏ qua nếu inner chứa tag giá gốc (bị gạch ngang)
             if '<del' in inner.lower() or '<strike' in inner.lower():
                 continue
             pm = re.search(price_pattern, inner, re.IGNORECASE)
-            if pm:
-                current_price = pm.group(1)
-                break
+            if pm and not current_price:
+                val = re.sub(r'[^\d]', '', pm.group(1))
+                if val and int(val) >= 50000:
+                    current_price = pm.group(1)
+                    break
+                
+        # 3c. Giá niêm yết/giá cũ (nếu chưa tìm thấy qua thẻ <del>)
+        if not original_price:
+            for om in ORIGINAL_PRICE_CLASS_PATTERN.finditer(html):
+                inner = om.group(1)
+                pm = re.search(price_pattern, inner, re.IGNORECASE)
+                if pm:
+                    val = re.sub(r'[^\d]', '', pm.group(1))
+                    if val and int(val) >= 50000:
+                        original_price = pm.group(1)
+                        break
 
         # ═══ TẦNG 4: ANCHOR FALLBACK (P2) — Tìm giá gần nút mua hàng ═══
         if not current_price and soup:

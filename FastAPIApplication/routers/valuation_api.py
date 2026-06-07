@@ -272,30 +272,94 @@ def build_no_data_result(product_name: str, reason: str) -> Dict[str, Any]:
     }
 
 
-def normalize_valuation_result(result: Dict[str, Any]) -> Dict[str, Any]:
+def extract_quotes_from_internet_data(internet_data: str) -> List[Dict]:
+    quotes = []
+    blocks = re.split(r'\[\d+\] Nguồn tham khảo\n', internet_data)
+    for block in blocks:
+        if not block.strip():
+            continue
+        lines = block.split('\n')
+        url = ""
+        price = ""
+        description = "Nguồn tham khảo"
+        for line in lines:
+            line = line.strip()
+            if line.startswith("URL:"):
+                url = line.replace("URL:", "").strip()
+            elif "Giá hiện tại (current_price):" in line:
+                p_str = line.split("Giá hiện tại (current_price):")[1]
+                p_str = p_str.split("VNĐ")[0].strip()
+                price = p_str
+            elif "Tên sản phẩm trên web:" in line:
+                description = line.replace("Tên sản phẩm trên web:", "").strip()
+        
+        if url and price:
+            quotes.append({
+                "description": description,
+                "url": url,
+                "price": price
+            })
+    return quotes
+
+def normalize_valuation_result(result: Dict[str, Any], internet_data: str = "") -> Dict[str, Any]:
+    if internet_data:
+        extracted = extract_quotes_from_internet_data(internet_data)
+        if extracted:
+            result["reference_quotes"] = extracted
+
     reference_quotes = result.get("reference_quotes")
 
     if not isinstance(reference_quotes, list):
         reference_quotes = []
 
-    normalized_quotes = []
+    all_quotes = []
 
-    for quote in reference_quotes[:1]:
+    for quote in reference_quotes:
         if not isinstance(quote, dict):
             continue
 
         url = str(quote.get("url") or "").strip()
-        # Đảm bảo URL hợp lệ (bắt đầu bằng http)
+        # Đảm bảo URL hợp lệ
         if url and not url.startswith("http"):
-            url = ""
+            if url.startswith("www.") or re.match(r'^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}', url):
+                url = "https://" + url
+            else:
+                url = ""
 
-        normalized_quotes.append(
+        parsed_p = parse_price_number(str(quote.get("price") or ""))
+        all_quotes.append(
             {
                 "description": str(quote.get("description") or "Nguồn tham khảo").strip(),
                 "price": str(quote.get("price") or "Không rõ").strip(),
                 "url": url,
+                "parsed_price": parsed_p
             }
         )
+
+    # Lọc ra các nguồn có giá hợp lệ
+    valid_quotes = [q for q in all_quotes if q["parsed_price"] is not None and q["parsed_price"] > 0]
+
+    if not valid_quotes:
+        # Nếu không có nguồn nào có giá parse được, dùng tạm các nguồn đầu tiên
+        normalized_quotes = [{k: v for k, v in q.items() if k != "parsed_price"} for q in all_quotes[:2]]
+    else:
+        from collections import Counter
+        # Tính tần suất xuất hiện của các mức giá
+        price_counts = Counter([q["parsed_price"] for q in valid_quotes])
+        # Lấy mức giá phổ biến nhất
+        most_common_price = price_counts.most_common(1)[0][0]
+        
+        # Nhóm các quote có mức giá phổ biến nhất
+        best_quotes = [q for q in valid_quotes if q["parsed_price"] == most_common_price]
+        
+        # Nếu chưa đủ 2 nguồn, bổ sung thêm từ nhóm khác
+        if len(best_quotes) < 2:
+            other_quotes = [q for q in valid_quotes if q["parsed_price"] != most_common_price]
+            best_quotes.extend(other_quotes)
+            
+        # Chọn tối đa 2 nguồn
+        selected_quotes = best_quotes[:2]
+        normalized_quotes = [{k: v for k, v in q.items() if k != "parsed_price"} for q in selected_quotes]
 
     # --- Kiểm tra sự nhất quán giá giữa các nguồn ---
     price_check = check_price_consistency(normalized_quotes)
@@ -465,20 +529,11 @@ Nhiệm vụ:
 8. Nếu không đủ dữ liệu, final_price phải là "Không đủ dữ liệu định giá".
 9. confidence chỉ được là một trong ba giá trị: "cao", "trung bình", "thấp".
 10. legal_compliance phải nêu hệ thống đã tuân thủ quy tắc nào.
-11. SỐ LƯỢNG KẾT QUẢ: BẮT BUỘC TRẢ VỀ ĐÚNG 1 NGUỒN THAM KHẢO GIÁ DUY NHẤT. Chọn nguồn có thông tin giá rõ ràng và khớp với sản phẩm nhất.
-12. TIÊU CHÍ CHỌN: Chỉ chọn kết quả KHỚP ĐÚNG SẢN PHẨM và BẮT BUỘC PHẢI CÓ GIÁ. TUYỆT ĐỐI KHÔNG LẤY GIÁ CỦA SẢN PHẨM NÀY GHÉP CHO SẢN PHẨM KHÁC.
-13. URL CHÍNH XÁC: Trường "url" BẮT BUỘC phải là link chi tiết đến tận trang bán sản phẩm đó (giữ nguyên đầy đủ tham số). Tuyệt đối không được tự ý rút gọn URL thành link trang chủ.
+11. DO NOT return `reference_quotes`. The system will automatically extract and attach the quotes for you.
 
 Trả về DUY NHẤT một JSON object theo định dạng:
 
 {{
-  "reference_quotes": [
-    {{
-      "description": "Chỉ ghi TÊN SẢN PHẨM chính xác (ví dụ: iPhone 16 Pro Max 256GB), TUYỆT ĐỐI KHÔNG kèm tên trang web/shop",
-      "price": "Mức giá bằng VND, ví dụ: 62.700.000",
-      "url": "https://url-chi-tiet-den-tan-trang-san-pham.com (tuyệt đối giữ nguyên link đầy đủ)"
-    }}
-  ],
   "final_price": "Mức giá định giá dự kiến bằng VND hoặc Không đủ dữ liệu định giá",
   "basis": "Giải thích căn cứ định giá, nguồn dữ liệu, cách tiếp cận và giả định nếu có",
   "confidence": "cao/trung bình/thấp",
@@ -494,7 +549,7 @@ Trả về DUY NHẤT một JSON object theo định dạng:
 
         try:
             valuation_result = safe_json_loads(final_output)
-            valuation_result = normalize_valuation_result(valuation_result)
+            valuation_result = normalize_valuation_result(valuation_result, internet_data)
 
         except Exception:
             valuation_result = build_no_data_result(
@@ -610,188 +665,7 @@ def _detect_product_column(headers: List[str]) -> int:
     return 0
 
 
-# === [LEGACY] Rate limiter cho Tavily API — commented out, replaced by Google Search Grounding ===
-# _tavily_lock = threading.Lock()
-# _tavily_last_call_time = 0.0
-#
-#
-# def _rate_limited_tavily_call(tavily_search, query: str) -> Any:
-#     """Gọi Tavily API với rate limit: tối thiểu 1.5s giữa các lần gọi."""
-#     global _tavily_last_call_time
-#     with _tavily_lock:
-#         now = time.time()
-#         wait = 1.5 - (now - _tavily_last_call_time)
-#         if wait > 0:
-#             time.sleep(wait)
-#         _tavily_last_call_time = time.time()
-#     return tavily_search.invoke(query)
-# === [END LEGACY] ===
 
-
-# === [LEGACY] DuckDuckGo search — commented out, replaced by Google Search Grounding ===
-# def _search_duckduckgo(query: str, max_results: int = 3) -> List[Dict[str, str]]:
-#     """Tìm kiếm bằng DuckDuckGo (bắt lỗi rate limit nếu có)."""
-#     if not DDGS:
-#         return []
-#     try:
-#         items = []
-#         with DDGS() as ddgs:
-#             # Dùng backend lite/html thường ổn định hơn
-#             results = ddgs.text(query, max_results=max_results, backend="lite")
-#             for r in results:
-#                 items.append({
-#                     "title": r.get("title", ""),
-#                     "content": r.get("body", ""),
-#                     "url": r.get("href", "")
-#                 })
-#         return items
-#     except Exception:
-#         return []
-# === [END LEGACY] ===
-
-
-# === [LEGACY] _sync_search_internet_for_batch (Tavily + DuckDuckGo) — commented out ===
-# def _sync_search_internet_for_batch(product_name: str) -> Dict[str, Any]:
-#     """
-#     Tìm kiếm Internet cho 1 sản phẩm trong batch.
-#     Sử dụng rate limiter để tránh Tavily bị chặn.
-#     Ưu tiên tìm kiếm trong các domain đã đăng ký theo category.
-#     """
-#     if not os.environ.get("TAVILY_API_KEY"):
-#         return {"price": "", "url": "", "description": "", "confidence": "thấp"}
-#
-#     # Phát hiện category để lấy domain ưu tiên
-#     understood = understand_product_query(product_name)
-#     category_hint = understood["category_hint"]
-#     priority_domains = get_domains_for_category(category_hint)
-#
-#     try:
-#         if priority_domains:
-#             tavily_search = TavilySearch(
-#                 max_results=5,
-#                 include_domains=priority_domains,
-#             )
-#         else:
-#             tavily_search = TavilySearch(max_results=5)
-#     except Exception:
-#         return {"price": "", "url": "", "description": "", "confidence": "thấp"}
-#
-#     # Dùng 2 queries ngắn gọn
-#     queries = [
-#         f"giá {product_name} chính hãng Việt Nam",
-#         f"{product_name} giá bán",
-#     ]
-#
-#     all_items: List[Dict[str, str]] = []
-#
-#     for query in queries:
-#         # Ưu tiên tìm bằng Tavily trước (với domain ưu tiên)
-#         for attempt in range(3):
-#             try:
-#                 raw_results = _rate_limited_tavily_call(tavily_search, query)
-#                 items = extract_tavily_results(raw_results)
-#                 for item in items:
-#                     item["query"] = query
-#                     item["source"] = "tavily"
-#                     all_items.append(item)
-#                 break
-#             except Exception:
-#                 wait_time = 2 * (attempt + 1)  # 2s, 4s, 6s
-#                 time.sleep(wait_time)
-#                 continue
-#
-#         # Thoát nếu đã có đủ dữ liệu từ Tavily
-#         if len(all_items) >= 5:
-#             break
-#
-#     # Fallback: nếu dùng domain ưu tiên mà Tavily trả ít, tìm lại không giới hạn domain
-#     if len(all_items) < 2 and priority_domains:
-#         try:
-#             tavily_fallback = TavilySearch(max_results=3)
-#             for query in queries:
-#                 for attempt in range(2):
-#                     try:
-#                         raw_results = _rate_limited_tavily_call(tavily_fallback, query)
-#                         items = extract_tavily_results(raw_results)
-#                         for item in items:
-#                             item["query"] = query
-#                             item["source"] = "tavily_fallback"
-#                             all_items.append(item)
-#                         break
-#                     except Exception:
-#                         time.sleep(2 * (attempt + 1))
-#                         continue
-#                 if len(all_items) >= 5:
-#                     break
-#         except Exception:
-#             pass
-#
-#     # Nếu Tavily trả về quá ít dữ liệu (hoặc không có), dùng DuckDuckGo để bổ trợ
-#     if len(all_items) < 3:
-#         for query in queries:
-#             ddg_results = _search_duckduckgo(query, max_results=3)
-#             for r in ddg_results:
-#                 r["query"] = query
-#                 r["source"] = "duckduckgo"
-#                 all_items.append(r)
-#
-#             if len(all_items) >= 5:
-#                 break
-#
-#     if not all_items:
-#         return {"price": "", "url": "", "description": "", "confidence": "thấp"}
-#
-#     # Format kết quả cho LLM - Tối ưu hóa để tiết kiệm token
-#     formatted = []
-#     # Chỉ lấy tối đa 5 kết quả tốt nhất thay vì 10 để tiết kiệm token
-#     for idx, item in enumerate(all_items[:5], start=1):
-#         title = item.get("title") or ""
-#         content = item.get("content") or ""
-#         # Cắt ngắn nội dung còn 300 ký tự (đủ để AI đọc được giá xung quanh từ khóa)
-#         if len(content) > 300:
-#             content = content[:300] + "..."
-#
-#         url = item.get("url") or ""
-#         source = item.get("source") or "unknown"
-#         formatted.append(
-#             f"[{idx}] (Nguồn: {source}) {title}\nURL: {url}\n{content}"
-#         )
-#     internet_data = "\n\n".join(formatted)
-#
-#     # Dùng LLM để trích xuất giá (model nhẹ cho batch)
-#     llm = ChatOllama(
-#         model="qwen2.5:3b",
-#         temperature=0,
-#         format="json",
-#         num_predict=256,
-#     )
-#
-#     prompt = f"""Trích xuất giá bán của sản phẩm "{product_name}" từ dữ liệu sau.
-# LƯU Ý:
-# - Nếu có giá gốc (giá niêm yết) và giá sau khi giảm (giá khuyến mãi), BẮT BUỘC lấy giá SAU KHI ĐÃ GIẢM GIÁ làm kết quả.
-# - CHỈ LẤY GIÁ TỪ TRANG BÁN HÀNG.
-#
-# {internet_data}
-#
-# Trả về JSON:
-# {{
-#   "final_price": "giá VND thấp nhất",
-#   "url": "URL nguồn có giá (bắt đầu bằng https://)",
-#   "description": "tên nguồn"
-# }}"""
-#
-#     try:
-#         response = llm.invoke(prompt)
-#         result = safe_json_loads(response.content)
-#         return {
-#             "price": str(result.get("final_price", "")).strip(),
-#             "url": str(result.get("url", "")).strip(),
-#             "description": str(result.get("description", "")).strip(),
-#             "confidence": "trung bình",
-#         }
-#     except Exception:
-#         return {"price": "", "url": "", "description": "", "confidence": "thấp"}
-# === [END LEGACY] ===
 
 
 def _sync_search_internet_for_batch(product_name: str) -> Dict[str, Any]:

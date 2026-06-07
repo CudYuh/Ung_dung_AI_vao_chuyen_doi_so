@@ -904,12 +904,10 @@ function App() {
                                             </p>
 
                                             <p className="text-blue-400 font-bold">
-                                              {quote.price}{" "}
-                                              {String(quote.price)
-                                                .toLowerCase()
-                                                .includes("vnd")
-                                                ? ""
-                                                : "VND"}
+                                              {String(quote.price).replace(/[^\d]/g, "")
+                                                ? parseInt(String(quote.price).replace(/[^\d]/g, ""), 10).toLocaleString("de-DE")
+                                                : quote.price}{" "}
+                                              VND
                                             </p>
 
                                             {quote.url && (
@@ -929,7 +927,9 @@ function App() {
                                             <button
                                               onClick={() =>
                                                 approvePrice(
-                                                  quote.price,
+                                                  String(quote.price).replace(/[^\d]/g, "") 
+                                                    ? parseInt(String(quote.price).replace(/[^\d]/g, ""), 10).toLocaleString("de-DE") 
+                                                    : quote.price,
                                                   quote.url || "Internet",
                                                   quote.description,
                                                 )
