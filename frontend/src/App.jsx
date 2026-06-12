@@ -626,7 +626,7 @@ function App() {
                   {batchLoading ? (
                     <span className="text-sm text-slate-300 flex items-center gap-2 font-medium">
                       <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-                      Đang xử lý hàng loạt...
+                      Đang xử lý & chụp ảnh sản phẩm... (vui lòng chờ)
                     </span>
                   ) : (
                     <span className="text-sm text-slate-500 font-medium">

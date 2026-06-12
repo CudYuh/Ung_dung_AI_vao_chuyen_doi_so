@@ -585,8 +585,11 @@ def take_desktop_screenshot_sync(product_name: str, urls: List[str] = None):
             return ""
 
 
-def take_batch_screenshots_sync(screenshot_jobs: List[Dict[str, str]]):
-    """Chụp ảnh màn hình cho hàng loạt sản phẩm từ file upload (tuần tự)"""
+def take_batch_screenshots_sync(screenshot_jobs: List[Dict]) -> Dict[int, str]:
+    """Chụp ảnh màn hình cho hàng loạt sản phẩm từ file upload (tuần tự).
+    
+    Trả về dict {row_index: filepath} để endpoint có thể nhúng ảnh vào đúng hàng Excel.
+    """
     import pyautogui
     import time
     import webbrowser
@@ -598,9 +601,12 @@ def take_batch_screenshots_sync(screenshot_jobs: List[Dict[str, str]]):
     save_dir = Path(__file__).resolve().parents[2] / "screenshots"
     save_dir.mkdir(exist_ok=True)
 
+    result_map: Dict[int, str] = {}
+
     for job in screenshot_jobs:
         product_name = job.get("product_name", "product")
         url = job.get("url")
+        row_index = job.get("row_index")
         if not url or not url.startswith("http"):
             continue
 
@@ -628,8 +634,16 @@ def take_batch_screenshots_sync(screenshot_jobs: List[Dict[str, str]]):
             pyautogui.hotkey('ctrl', 'w')
             time.sleep(1.5)
 
+            # Ghi nhận filepath cho hàng tương ứng
+            if row_index is not None:
+                result_map[row_index] = str(filepath)
+
         except Exception as e:
             print(f"Error during batch screenshot for {product_name}: {e}")
+            if row_index is not None:
+                result_map[row_index] = ""
+
+    return result_map
 
 
 @router.post("/valuate")
@@ -942,12 +956,14 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
         # Tự động phát hiện cột chứa tên sản phẩm
         product_col_idx = _detect_product_column(headers)
         
-        # Danh sách lưu các job chụp màn hình
+        # Danh sách lưu các job chụp màn hình (có row_index để map về đúng hàng)
         screenshot_jobs = []
         processed_rows = []
         
         # Xử lý song song theo batch (3 sản phẩm cùng lúc)
         BATCH_SIZE = 3
+        global_row_index = 0  # index hàng trong processed_rows (không tính header)
+        
         for batch_start in range(0, len(rows), BATCH_SIZE):
             batch_rows = rows[batch_start:batch_start + BATCH_SIZE]
             
@@ -978,16 +994,31 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
                     link = result.get("link", "")
                     note = result.get("note", "")
                     
-                # Thu thập link hợp lệ để chụp màn hình
+                # Thu thập link hợp lệ để chụp màn hình — lưu kèm row_index
                 if link and link.startswith("http"):
-                    # Xác định lại tên sản phẩm chính xác
                     if product_col_idx < len(row):
                         prod_name = str(row[product_col_idx]).strip()
                     else:
                         prod_name = str(row[0]).strip() if row else ""
                     if not prod_name:
                         prod_name = "product"
-                    screenshot_jobs.append({"product_name": prod_name, "url": link})
+                    screenshot_jobs.append({
+                        "product_name": prod_name,
+                        "url": link,
+                        "row_index": global_row_index,
+                    })
+                    
+                # Định dạng giá cho Excel/CSV (luôn hiển thị dấu chấm và căn trái)
+                if price and price not in ("Không đủ dữ liệu", "Không có dữ liệu"):
+                    import re
+                    num_str = re.sub(r'[^\d]', '', price)
+                    if num_str:
+                        formatted = f"{int(num_str):,}".replace(",", ".")
+                        excel_price = f'="{formatted}"'
+                    else:
+                        excel_price = f'="{price}"'
+                else:
+                    excel_price = price
                     
                 # Định dạng link cho Excel/CSV
                 if link and link.startswith("http"):
@@ -995,43 +1026,111 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
                 else:
                     excel_link = link
                     
-                processed_rows.append(row + [price, excel_link, note])
-                
-        # Thêm tác vụ chụp ảnh màn hình tuần tự vào background task (giới hạn tối đa 30 jobs)
-        if screenshot_jobs and background_tasks:
-            background_tasks.add_task(take_batch_screenshots_sync, screenshot_jobs[:30])
-            
+                processed_rows.append(row + [excel_price, excel_link, note])
+                global_row_index += 1
+
+        # ── Chụp ảnh màn hình ĐỒNG BỘ (foreground) để có filepath trước khi xuất Excel ──
+        screenshot_map: Dict[int, str] = {}
+        if screenshot_jobs:
+            screenshot_map = await run_in_threadpool(
+                take_batch_screenshots_sync, screenshot_jobs[:30]
+            )
+
         output_headers = headers + ["Gia_du_kien", "Link_tham_khao", "Ghi_chu"]
-        
+
         if is_excel:
-            # Tạo DataFrame và ghi ra file Excel
+            # ── Xuất Excel và nhúng ảnh trực tiếp vào cột Anh_san_pham ──
             out_df = pd.DataFrame(processed_rows, columns=output_headers)
             out_buffer = io.BytesIO()
-            out_df.to_excel(out_buffer, index=False, engine='openpyxl')
+            out_df.to_excel(out_buffer, index=False, engine="openpyxl")
             out_buffer.seek(0)
-            
+
+            if screenshot_map:
+                try:
+                    from openpyxl import load_workbook
+                    from openpyxl.drawing.image import Image as XLImage
+                    from openpyxl.utils import get_column_letter
+                    from PIL import Image as PILImage
+                    from pathlib import Path as _Path
+
+                    wb = load_workbook(out_buffer)
+                    ws = wb.active
+
+                    # Thêm header cột ảnh ở cột tiếp theo sau Ghi_chu
+                    img_col_idx = len(output_headers) + 1
+                    img_col_letter = get_column_letter(img_col_idx)
+                    ws[f"{img_col_letter}1"] = "Anh_san_pham"
+
+                    # Kích thước thumbnail hiển thị trong Excel (400x225px)
+                    THUMB_W = 400
+                    THUMB_H = 225
+                    ROW_HEIGHT_PT = 170
+                    COL_WIDTH = 55
+
+                    ws.column_dimensions[img_col_letter].width = COL_WIDTH
+
+                    for row_idx, filepath in screenshot_map.items():
+                        if not filepath:
+                            continue
+                        p = _Path(filepath)
+                        if not p.exists():
+                            continue
+
+                        excel_row = row_idx + 2  # +1 bù header, +1 vì 1-indexed
+
+                        # Resize thumbnail bằng Pillow trước khi nhúng
+                        with PILImage.open(p) as pil_img:
+                            pil_img.thumbnail((THUMB_W, THUMB_H), PILImage.LANCZOS)
+                            thumb_buf = io.BytesIO()
+                            pil_img.save(thumb_buf, format="PNG")
+                            thumb_buf.seek(0)
+
+                        xl_img = XLImage(thumb_buf)
+                        xl_img.width = THUMB_W
+                        xl_img.height = THUMB_H
+                        xl_img.anchor = f"{img_col_letter}{excel_row}"
+
+                        ws.add_image(xl_img)
+                        ws.row_dimensions[excel_row].height = ROW_HEIGHT_PT
+
+                    final_buffer = io.BytesIO()
+                    wb.save(final_buffer)
+                    final_buffer.seek(0)
+                    out_buffer = final_buffer
+
+                except Exception as img_err:
+                    print(f"[WARN] Không thể nhúng ảnh vào Excel: {img_err}")
+                    out_buffer.seek(0)
+
             return StreamingResponse(
                 out_buffer,
                 media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                headers={"Content-Disposition": "attachment; filename=batch_valuation_result.xlsx"}
+                headers={"Content-Disposition": "attachment; filename=batch_valuation_result.xlsx"},
             )
         else:
-            # Ghi ra file CSV
+            # ── CSV fallback: thêm cột Link_anh dạng đường dẫn text ──
+            csv_output_headers = output_headers + ["Link_anh"]
+            csv_rows = []
+            for r_idx, r in enumerate(processed_rows):
+                link_anh = screenshot_map.get(r_idx, "")
+                csv_rows.append(r + [link_anh])
+
             output = io.StringIO()
             writer = csv.writer(output)
-            output.write('\ufeff')  # BOM cho tiếng Việt hiển thị tốt trong Excel
-            writer.writerow(output_headers)
-            writer.writerows(processed_rows)
+            output.write("﻿")  # BOM cho tiếng Việt hiển thị tốt trong Excel
+            writer.writerow(csv_output_headers)
+            writer.writerows(csv_rows)
             output.seek(0)
-            
+
             return StreamingResponse(
-                io.BytesIO(output.getvalue().encode('utf-8')),
+                io.BytesIO(output.getvalue().encode("utf-8")),
                 media_type="text/csv",
-                headers={"Content-Disposition": "attachment; filename=batch_valuation_result.csv"}
+                headers={"Content-Disposition": "attachment; filename=batch_valuation_result.csv"},
             )
-            
+
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
 
 @router.get("/valuate/test_batch")
 async def test_batch():
