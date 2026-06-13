@@ -7,6 +7,6 @@ LLM Wiki chuyển dữ liệu đó thành entity, concept, index và graph để
 
 ## Thống kê
 
-- Tổng số vật tư được đồng bộ: 1968
+- Tổng số vật tư được đồng bộ: 1975
 - Tổng số concept nghiệp vụ: 5
-- Cập nhật lần cuối: 13/06/2026 02:09:39
+- Cập nhật lần cuối: 14/06/2026 01:28:28
