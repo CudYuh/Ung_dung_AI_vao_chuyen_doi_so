@@ -81,3 +81,4 @@
 - 01/06/2026 16:44:56 — Sync vật tư mới/cập nhật vào LLM Wiki: TV - LG OLED evo C5 55 inch - ID 1967.0.
 - 01/06/2026 16:45:00 — Sync vật tư mới/cập nhật vào LLM Wiki: Màn hình máy tính - LG UltraGear 27 inch - ID 1968.0.
 - 01/06/2026 16:45:03 — Sync vật tư mới/cập nhật vào LLM Wiki: TV - Samsung Smart TV QLED 55 inch - ID 1969.0.
+- 13/06/2026 02:09:39 — Sync vật tư mới/cập nhật vào LLM Wiki: Điện thoại iPhone 17 Pro 256GB - ID 1970.0.
