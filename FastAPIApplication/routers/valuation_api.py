@@ -16,6 +16,8 @@ from pydantic import BaseModel
 
 from services.llm_wiki.legal_rules import load_legal_rules_for_ai
 from routers.domain_registry import get_domains_for_category, detect_category_from_keywords
+from database import session_local
+from models import Product
 
 
 ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
@@ -803,6 +805,102 @@ async def _process_single_product(product_name: str) -> Dict[str, str]:
     return {"price": price, "link": link, "note": note}
 
 
+def _lookup_price_in_db(product_name: str) -> str:
+    """Tra cứu giá sản phẩm trong CSDL nội bộ (bảng danh_muc_vat_tu).
+    Tìm theo tên gần đúng (ILIKE). Trả về giá nếu có, ngược lại 'Chưa có trong CSDL'.
+    """
+    db = session_local()
+    try:
+        search_query = f"%{product_name}%"
+        product = db.query(Product).filter(
+            Product.name.ilike(search_query)
+        ).first()
+        if product and product.price:
+            return str(product.price).strip()
+        return "Chưa có trong CSDL"
+    except Exception:
+        return "Chưa có trong CSDL"
+    finally:
+        db.close()
+
+
+def _save_new_products_to_db(products_to_save: List[Dict[str, str]]) -> Dict[str, Any]:
+    """Lưu hàng loạt sản phẩm mới vào database (chỉ những sản phẩm chưa tồn tại).
+
+    Mỗi phần tử trong products_to_save có dạng:
+        {"name": ..., "price": ..., "source": ...}
+
+    Returns:
+        {"saved": int, "skipped": int, "errors": int}
+    """
+    from sqlalchemy import func
+    from datetime import datetime
+    from services.llm_wiki.framework import sync_product_to_wiki
+
+    db = session_local()
+    saved = 0
+    skipped = 0
+    errors = 0
+
+    try:
+        for item in products_to_save:
+            name = item.get("name", "").strip()
+            price = item.get("price", "").strip()
+            source = item.get("source", "")
+
+            if not name or not price:
+                skipped += 1
+                continue
+
+            # Kiểm tra xem sản phẩm đã tồn tại trong DB chưa (tìm chính xác)
+            existing = db.query(Product).filter(
+                Product.name.ilike(f"%{name}%")
+            ).first()
+
+            if existing:
+                skipped += 1
+                continue
+
+            try:
+                max_id = db.query(func.max(Product.id)).scalar() or 0
+                new_id = float(int(max_id) + 1)
+
+                new_product = Product(
+                    id=new_id,
+                    name=name,
+                    price=price,
+                    source=source,
+                    specifications="",
+                    category=None,
+                    unit="Cái",
+                    appraisal_date=datetime.now().strftime("%d/%m/%Y"),
+                    appraiser="AI Batch System",
+                    certificate_number="AI-BATCH-" + datetime.now().strftime("%Y%m%d%H%M%S"),
+                )
+
+                db.add(new_product)
+                db.commit()
+                db.refresh(new_product)
+                saved += 1
+
+                # Đồng bộ sang LLM Wiki (bỏ qua lỗi wiki để không ảnh hưởng batch)
+                try:
+                    sync_product_to_wiki(new_product)
+                except Exception:
+                    pass
+
+            except Exception:
+                db.rollback()
+                errors += 1
+
+    except Exception:
+        errors += 1
+    finally:
+        db.close()
+
+    return {"saved": saved, "skipped": skipped, "errors": errors}
+
+
 @router.post("/valuate/batch")
 async def valuate_batch(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     try:
@@ -840,6 +938,8 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
         # Danh sách lưu các job chụp màn hình (có row_index để map về đúng hàng)
         screenshot_jobs = []
         processed_rows = []
+        # Danh sách sản phẩm cần lưu vào DB (chưa có trong CSDL + AI tìm được giá)
+        pending_db_saves: List[Dict[str, str]] = []
         
         # Xử lý song song theo batch (3 sản phẩm cùng lúc)
         BATCH_SIZE = 3
@@ -900,6 +1000,35 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
                         excel_price = f'="{price}"'
                 else:
                     excel_price = price
+
+                # Tra cứu giá trong CSDL nội bộ
+                if product_col_idx < len(row):
+                    db_lookup_name = str(row[product_col_idx]).strip()
+                else:
+                    db_lookup_name = str(row[0]).strip() if row else ""
+                if db_lookup_name:
+                    db_price_raw = await run_in_threadpool(_lookup_price_in_db, db_lookup_name)
+                else:
+                    db_price_raw = "Chưa có trong CSDL"
+
+                # Định dạng giá CSDL cho Excel (có dấu chấm phân cách)
+                if db_price_raw and db_price_raw != "Chưa có trong CSDL":
+                    db_num_str = re.sub(r'[^\d]', '', db_price_raw)
+                    if db_num_str:
+                        db_formatted = f"{int(db_num_str):,}".replace(",", ".")
+                        excel_db_price = f'="{db_formatted}"'
+                    else:
+                        excel_db_price = db_price_raw
+                else:
+                    excel_db_price = db_price_raw
+
+                # Thu thập sản phẩm chưa có trong CSDL + AI tìm được giá → lưu sau
+                if db_price_raw == "Chưa có trong CSDL" and price and price not in ("Không đủ dữ liệu", "Không có dữ liệu"):
+                    pending_db_saves.append({
+                        "name": db_lookup_name,
+                        "price": price,
+                        "source": link if link and link.startswith("http") else "AI Batch Valuation",
+                    })
                     
                 # Định dạng link cho Excel/CSV
                 if link and link.startswith("http"):
@@ -907,8 +1036,18 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
                 else:
                     excel_link = link
                     
-                processed_rows.append(row + [excel_price, excel_link, note])
+                processed_rows.append(row + [excel_price, excel_db_price, excel_link, note])
                 global_row_index += 1
+
+        # ── Tự động lưu sản phẩm mới vào database ──
+        db_save_result = {"saved": 0, "skipped": 0, "errors": 0}
+        if pending_db_saves:
+            db_save_result = await run_in_threadpool(
+                _save_new_products_to_db, pending_db_saves
+            )
+            print(f"[BATCH DB SAVE] Saved: {db_save_result['saved']}, "
+                  f"Skipped: {db_save_result['skipped']}, "
+                  f"Errors: {db_save_result['errors']}")
 
         # ── Chụp ảnh màn hình ĐỒNG BỘ (foreground) để có filepath trước khi xuất Excel ──
         screenshot_map: Dict[int, str] = {}
@@ -916,8 +1055,19 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
             screenshot_map = await run_in_threadpool(
                 take_batch_screenshots_sync, screenshot_jobs[:30]
             )
+        # ── Thêm cột Link_anh vào processed_rows (HYPERLINK do pandas ghi, giống Link_tham_khao) ──
+        output_headers = headers + ["Gia_du_kien", "Gia_trong_CSDL", "Link_tham_khao", "Ghi_chu", "Link_anh"]
 
-        output_headers = headers + ["Gia_du_kien", "Link_tham_khao", "Ghi_chu"]
+        for r_idx in range(len(processed_rows)):
+            filepath = screenshot_map.get(r_idx, "")
+            if filepath:
+                from pathlib import Path as _Path
+                p = _Path(filepath)
+                full_path = str(p.resolve())
+                excel_link_anh = f'=HYPERLINK("{full_path}","Mở ảnh")'
+            else:
+                excel_link_anh = ""
+            processed_rows[r_idx].append(excel_link_anh)
 
         if is_excel:
             # ── Xuất Excel và nhúng ảnh trực tiếp vào cột Anh_san_pham ──
@@ -926,21 +1076,28 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
             out_df.to_excel(out_buffer, index=False, engine="openpyxl")
             out_buffer.seek(0)
 
-            if screenshot_map:
-                try:
-                    from openpyxl import load_workbook
-                    from openpyxl.drawing.image import Image as XLImage
-                    from openpyxl.utils import get_column_letter
-                    from PIL import Image as PILImage
-                    from pathlib import Path as _Path
+            try:
+                from openpyxl import load_workbook
+                from openpyxl.drawing.image import Image as XLImage
+                from openpyxl.utils import get_column_letter
+                from openpyxl.styles import Font, Alignment
+                from PIL import Image as PILImage
+                from pathlib import Path as _Path
 
-                    wb = load_workbook(out_buffer)
-                    ws = wb.active
+                wb = load_workbook(out_buffer)
+                ws = wb.active
 
-                    # Thêm header cột ảnh ở cột tiếp theo sau Ghi_chu
+                # ── Điều chỉnh chiều rộng cột Link_anh cho gọn ──
+                link_anh_col_idx = len(output_headers)  # cột cuối cùng
+                link_anh_col_letter = get_column_letter(link_anh_col_idx)
+                ws.column_dimensions[link_anh_col_letter].width = 15
+
+                # ── Cột Anh_san_pham (nhúng ảnh thumbnail) ──
+                if screenshot_map:
                     img_col_idx = len(output_headers) + 1
                     img_col_letter = get_column_letter(img_col_idx)
                     ws[f"{img_col_letter}1"] = "Anh_san_pham"
+                    ws[f"{img_col_letter}1"].font = Font(bold=True)
 
                     # Kích thước thumbnail hiển thị trong Excel (400x225px)
                     THUMB_W = 400
@@ -957,7 +1114,7 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
                         if not p.exists():
                             continue
 
-                        excel_row = row_idx + 2  # +1 bù header, +1 vì 1-indexed
+                        excel_row = row_idx + 2
 
                         # Resize thumbnail bằng Pillow trước khi nhúng
                         with PILImage.open(p) as pil_img:
@@ -974,14 +1131,14 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
                         ws.add_image(xl_img)
                         ws.row_dimensions[excel_row].height = ROW_HEIGHT_PT
 
-                    final_buffer = io.BytesIO()
-                    wb.save(final_buffer)
-                    final_buffer.seek(0)
-                    out_buffer = final_buffer
+                final_buffer = io.BytesIO()
+                wb.save(final_buffer)
+                final_buffer.seek(0)
+                out_buffer = final_buffer
 
-                except Exception as img_err:
-                    print(f"[WARN] Không thể nhúng ảnh vào Excel: {img_err}")
-                    out_buffer.seek(0)
+            except Exception as img_err:
+                print(f"[WARN] Không thể xử lý cột ảnh trong Excel: {img_err}")
+                out_buffer.seek(0)
 
             return StreamingResponse(
                 out_buffer,
@@ -989,18 +1146,12 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
                 headers={"Content-Disposition": "attachment; filename=batch_valuation_result.xlsx"},
             )
         else:
-            # ── CSV fallback: thêm cột Link_anh dạng đường dẫn text ──
-            csv_output_headers = output_headers + ["Link_anh"]
-            csv_rows = []
-            for r_idx, r in enumerate(processed_rows):
-                link_anh = screenshot_map.get(r_idx, "")
-                csv_rows.append(r + [link_anh])
-
+            # ── CSV fallback (Link_anh đã nằm trong processed_rows) ──
             output = io.StringIO()
             writer = csv.writer(output)
-            output.write("﻿")  # BOM cho tiếng Việt hiển thị tốt trong Excel
-            writer.writerow(csv_output_headers)
-            writer.writerows(csv_rows)
+            output.write("\ufeff")  # BOM cho tiếng Việt hiển thị tốt trong Excel
+            writer.writerow(output_headers)
+            writer.writerows(processed_rows)
             output.seek(0)
 
             return StreamingResponse(
@@ -1021,3 +1172,8 @@ async def test_batch():
         await asyncio.sleep(1)
         yield "1,2,3\n"
     return StreamingResponse(iter_test(), media_type="text/csv")
+
+@router.get("/valuate/test_env")
+async def test_env():
+    import sys
+    return {"executable": sys.executable, "path": sys.path}
