@@ -82,3 +82,10 @@
 - 01/06/2026 16:45:00 — Sync vật tư mới/cập nhật vào LLM Wiki: Màn hình máy tính - LG UltraGear 27 inch - ID 1968.0.
 - 01/06/2026 16:45:03 — Sync vật tư mới/cập nhật vào LLM Wiki: TV - Samsung Smart TV QLED 55 inch - ID 1969.0.
 - 13/06/2026 02:09:39 — Sync vật tư mới/cập nhật vào LLM Wiki: Điện thoại iPhone 17 Pro 256GB - ID 1970.0.
+- 14/06/2026 01:28:26 — Sync vật tư mới/cập nhật vào LLM Wiki: Điện thoại  Samsung Galaxy A36 5G - ID 1971.0.
+- 14/06/2026 01:28:26 — Sync vật tư mới/cập nhật vào LLM Wiki: Điện thoại  Xiaomi Redmi Note 15 - ID 1972.0.
+- 14/06/2026 01:28:26 — Sync vật tư mới/cập nhật vào LLM Wiki: Laptop  ASUS Vivobook 16 OLED ) - ID 1973.0.
+- 14/06/2026 01:28:27 — Sync vật tư mới/cập nhật vào LLM Wiki: Laptop  Lenovo IdeaPad Slim 5 Gen 11 - ID 1974.0.
+- 14/06/2026 01:28:27 — Sync vật tư mới/cập nhật vào LLM Wiki: Tai nghe  Sony WF-C710N - ID 1975.0.
+- 14/06/2026 01:28:27 — Sync vật tư mới/cập nhật vào LLM Wiki: Máy tính bảng  Samsung Galaxy Tab A10 - ID 1976.0.
+- 14/06/2026 01:28:28 — Sync vật tư mới/cập nhật vào LLM Wiki: Router WiFi  TP-Link Archer BE230 - ID 1977.0.

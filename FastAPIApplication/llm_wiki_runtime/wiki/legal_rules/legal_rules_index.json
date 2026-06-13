@@ -1,5 +1,10 @@
 {
+<<<<<<< HEAD
   "updated_at": "2026-06-13T02:03:54.580139",
+=======
+  "updated_at": "2026-06-07T13:35:03.061466",
+  "updated_at": "2026-06-07T13:35:03.061466",
+>>>>>>> 03ce3aa3cd4b2d638f13d86e853dee0e135a2f06
   "document_count": 5,
   "rule_count": 7,
   "documents": [

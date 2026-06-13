@@ -16,6 +16,8 @@ from pydantic import BaseModel
 
 from services.llm_wiki.legal_rules import load_legal_rules_for_ai
 from routers.domain_registry import get_domains_for_category, detect_category_from_keywords
+from database import session_local
+from models import Product
 
 
 ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
@@ -647,8 +649,11 @@ def take_desktop_screenshot_sync(product_name: str, urls: List[str] = None):
             return ""
 
 
-def take_batch_screenshots_sync(screenshot_jobs: List[Dict[str, str]]):
-    """Chụp ảnh màn hình cho hàng loạt sản phẩm từ file upload (tuần tự)"""
+def take_batch_screenshots_sync(screenshot_jobs: List[Dict]) -> Dict[int, str]:
+    """Chụp ảnh màn hình cho hàng loạt sản phẩm từ file upload (tuần tự).
+    
+    Trả về dict {row_index: filepath} để endpoint có thể nhúng ảnh vào đúng hàng Excel.
+    """
     import pyautogui
     import time
     import webbrowser
@@ -660,9 +665,12 @@ def take_batch_screenshots_sync(screenshot_jobs: List[Dict[str, str]]):
     save_dir = Path(__file__).resolve().parents[2] / "screenshots"
     save_dir.mkdir(exist_ok=True)
 
+    result_map: Dict[int, str] = {}
+
     for job in screenshot_jobs:
         product_name = job.get("product_name", "product")
         url = job.get("url")
+        row_index = job.get("row_index")
         if not url or not url.startswith("http"):
             continue
 
@@ -690,8 +698,16 @@ def take_batch_screenshots_sync(screenshot_jobs: List[Dict[str, str]]):
             pyautogui.hotkey('ctrl', 'w')
             time.sleep(1.5)
 
+            # Ghi nhận filepath cho hàng tương ứng
+            if row_index is not None:
+                result_map[row_index] = str(filepath)
+
         except Exception as e:
             print(f"Error during batch screenshot for {product_name}: {e}")
+            if row_index is not None:
+                result_map[row_index] = ""
+
+    return result_map
 
 
 @router.post("/valuate")
@@ -789,6 +805,102 @@ async def _process_single_product(product_name: str) -> Dict[str, str]:
     return {"price": price, "link": link, "note": note}
 
 
+def _lookup_price_in_db(product_name: str) -> str:
+    """Tra cứu giá sản phẩm trong CSDL nội bộ (bảng danh_muc_vat_tu).
+    Tìm theo tên gần đúng (ILIKE). Trả về giá nếu có, ngược lại 'Chưa có trong CSDL'.
+    """
+    db = session_local()
+    try:
+        search_query = f"%{product_name}%"
+        product = db.query(Product).filter(
+            Product.name.ilike(search_query)
+        ).first()
+        if product and product.price:
+            return str(product.price).strip()
+        return "Chưa có trong CSDL"
+    except Exception:
+        return "Chưa có trong CSDL"
+    finally:
+        db.close()
+
+
+def _save_new_products_to_db(products_to_save: List[Dict[str, str]]) -> Dict[str, Any]:
+    """Lưu hàng loạt sản phẩm mới vào database (chỉ những sản phẩm chưa tồn tại).
+
+    Mỗi phần tử trong products_to_save có dạng:
+        {"name": ..., "price": ..., "source": ...}
+
+    Returns:
+        {"saved": int, "skipped": int, "errors": int}
+    """
+    from sqlalchemy import func
+    from datetime import datetime
+    from services.llm_wiki.framework import sync_product_to_wiki
+
+    db = session_local()
+    saved = 0
+    skipped = 0
+    errors = 0
+
+    try:
+        for item in products_to_save:
+            name = item.get("name", "").strip()
+            price = item.get("price", "").strip()
+            source = item.get("source", "")
+
+            if not name or not price:
+                skipped += 1
+                continue
+
+            # Kiểm tra xem sản phẩm đã tồn tại trong DB chưa (tìm chính xác)
+            existing = db.query(Product).filter(
+                Product.name.ilike(f"%{name}%")
+            ).first()
+
+            if existing:
+                skipped += 1
+                continue
+
+            try:
+                max_id = db.query(func.max(Product.id)).scalar() or 0
+                new_id = float(int(max_id) + 1)
+
+                new_product = Product(
+                    id=new_id,
+                    name=name,
+                    price=price,
+                    source=source,
+                    specifications="",
+                    category=None,
+                    unit="Cái",
+                    appraisal_date=datetime.now().strftime("%d/%m/%Y"),
+                    appraiser="AI Batch System",
+                    certificate_number="AI-BATCH-" + datetime.now().strftime("%Y%m%d%H%M%S"),
+                )
+
+                db.add(new_product)
+                db.commit()
+                db.refresh(new_product)
+                saved += 1
+
+                # Đồng bộ sang LLM Wiki (bỏ qua lỗi wiki để không ảnh hưởng batch)
+                try:
+                    sync_product_to_wiki(new_product)
+                except Exception:
+                    pass
+
+            except Exception:
+                db.rollback()
+                errors += 1
+
+    except Exception:
+        errors += 1
+    finally:
+        db.close()
+
+    return {"saved": saved, "skipped": skipped, "errors": errors}
+
+
 @router.post("/valuate/batch")
 async def valuate_batch(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     try:
@@ -823,12 +935,16 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
         # Tự động phát hiện cột chứa tên sản phẩm
         product_col_idx = _detect_product_column(headers)
         
-        # Danh sách lưu các job chụp màn hình
+        # Danh sách lưu các job chụp màn hình (có row_index để map về đúng hàng)
         screenshot_jobs = []
         processed_rows = []
+        # Danh sách sản phẩm cần lưu vào DB (chưa có trong CSDL + AI tìm được giá)
+        pending_db_saves: List[Dict[str, str]] = []
         
         # Xử lý song song theo batch (3 sản phẩm cùng lúc)
         BATCH_SIZE = 3
+        global_row_index = 0  # index hàng trong processed_rows (không tính header)
+        
         for batch_start in range(0, len(rows), BATCH_SIZE):
             batch_rows = rows[batch_start:batch_start + BATCH_SIZE]
             
@@ -859,16 +975,19 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
                     link = result.get("link", "")
                     note = result.get("note", "")
                     
-                # Thu thập link hợp lệ để chụp màn hình
+                # Thu thập link hợp lệ để chụp màn hình — lưu kèm row_index
                 if link and link.startswith("http"):
-                    # Xác định lại tên sản phẩm chính xác
                     if product_col_idx < len(row):
                         prod_name = str(row[product_col_idx]).strip()
                     else:
                         prod_name = str(row[0]).strip() if row else ""
                     if not prod_name:
                         prod_name = "product"
-                    screenshot_jobs.append({"product_name": prod_name, "url": link})
+                    screenshot_jobs.append({
+                        "product_name": prod_name,
+                        "url": link,
+                        "row_index": global_row_index,
+                    })
                     
                 # Định dạng giá cho Excel/CSV (luôn hiển thị dấu chấm và căn trái)
                 if price and price not in ("Không đủ dữ liệu", "Không có dữ liệu"):
@@ -881,6 +1000,35 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
                         excel_price = f'="{price}"'
                 else:
                     excel_price = price
+
+                # Tra cứu giá trong CSDL nội bộ
+                if product_col_idx < len(row):
+                    db_lookup_name = str(row[product_col_idx]).strip()
+                else:
+                    db_lookup_name = str(row[0]).strip() if row else ""
+                if db_lookup_name:
+                    db_price_raw = await run_in_threadpool(_lookup_price_in_db, db_lookup_name)
+                else:
+                    db_price_raw = "Chưa có trong CSDL"
+
+                # Định dạng giá CSDL cho Excel (có dấu chấm phân cách)
+                if db_price_raw and db_price_raw != "Chưa có trong CSDL":
+                    db_num_str = re.sub(r'[^\d]', '', db_price_raw)
+                    if db_num_str:
+                        db_formatted = f"{int(db_num_str):,}".replace(",", ".")
+                        excel_db_price = f'="{db_formatted}"'
+                    else:
+                        excel_db_price = db_price_raw
+                else:
+                    excel_db_price = db_price_raw
+
+                # Thu thập sản phẩm chưa có trong CSDL + AI tìm được giá → lưu sau
+                if db_price_raw == "Chưa có trong CSDL" and price and price not in ("Không đủ dữ liệu", "Không có dữ liệu"):
+                    pending_db_saves.append({
+                        "name": db_lookup_name,
+                        "price": price,
+                        "source": link if link and link.startswith("http") else "AI Batch Valuation",
+                    })
                     
                 # Định dạng link cho Excel/CSV
                 if link and link.startswith("http"):
@@ -888,44 +1036,133 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
                 else:
                     excel_link = link
                     
-                processed_rows.append(row + [excel_price, excel_link, note])
-                
-        # Thêm tác vụ chụp ảnh màn hình tuần tự vào background task (giới hạn tối đa 30 jobs)
-        if screenshot_jobs and background_tasks:
-            background_tasks.add_task(take_batch_screenshots_sync, screenshot_jobs[:30])
-            
-        output_headers = headers + ["Gia_du_kien", "Link_tham_khao", "Ghi_chu"]
-        
+                processed_rows.append(row + [excel_price, excel_db_price, excel_link, note])
+                global_row_index += 1
+
+        # ── Tự động lưu sản phẩm mới vào database ──
+        db_save_result = {"saved": 0, "skipped": 0, "errors": 0}
+        if pending_db_saves:
+            db_save_result = await run_in_threadpool(
+                _save_new_products_to_db, pending_db_saves
+            )
+            print(f"[BATCH DB SAVE] Saved: {db_save_result['saved']}, "
+                  f"Skipped: {db_save_result['skipped']}, "
+                  f"Errors: {db_save_result['errors']}")
+
+        # ── Chụp ảnh màn hình ĐỒNG BỘ (foreground) để có filepath trước khi xuất Excel ──
+        screenshot_map: Dict[int, str] = {}
+        if screenshot_jobs:
+            screenshot_map = await run_in_threadpool(
+                take_batch_screenshots_sync, screenshot_jobs[:30]
+            )
+        # ── Thêm cột Link_anh vào processed_rows (HYPERLINK do pandas ghi, giống Link_tham_khao) ──
+        output_headers = headers + ["Gia_du_kien", "Gia_trong_CSDL", "Link_tham_khao", "Ghi_chu", "Link_anh"]
+
+        for r_idx in range(len(processed_rows)):
+            filepath = screenshot_map.get(r_idx, "")
+            if filepath:
+                from pathlib import Path as _Path
+                p = _Path(filepath)
+                full_path = str(p.resolve())
+                excel_link_anh = f'=HYPERLINK("{full_path}","Mở ảnh")'
+            else:
+                excel_link_anh = ""
+            processed_rows[r_idx].append(excel_link_anh)
+
         if is_excel:
-            # Tạo DataFrame và ghi ra file Excel
+            # ── Xuất Excel và nhúng ảnh trực tiếp vào cột Anh_san_pham ──
             out_df = pd.DataFrame(processed_rows, columns=output_headers)
             out_buffer = io.BytesIO()
-            out_df.to_excel(out_buffer, index=False, engine='openpyxl')
+            out_df.to_excel(out_buffer, index=False, engine="openpyxl")
             out_buffer.seek(0)
-            
+
+            try:
+                from openpyxl import load_workbook
+                from openpyxl.drawing.image import Image as XLImage
+                from openpyxl.utils import get_column_letter
+                from openpyxl.styles import Font, Alignment
+                from PIL import Image as PILImage
+                from pathlib import Path as _Path
+
+                wb = load_workbook(out_buffer)
+                ws = wb.active
+
+                # ── Điều chỉnh chiều rộng cột Link_anh cho gọn ──
+                link_anh_col_idx = len(output_headers)  # cột cuối cùng
+                link_anh_col_letter = get_column_letter(link_anh_col_idx)
+                ws.column_dimensions[link_anh_col_letter].width = 15
+
+                # ── Cột Anh_san_pham (nhúng ảnh thumbnail) ──
+                if screenshot_map:
+                    img_col_idx = len(output_headers) + 1
+                    img_col_letter = get_column_letter(img_col_idx)
+                    ws[f"{img_col_letter}1"] = "Anh_san_pham"
+                    ws[f"{img_col_letter}1"].font = Font(bold=True)
+
+                    # Kích thước thumbnail hiển thị trong Excel (400x225px)
+                    THUMB_W = 400
+                    THUMB_H = 225
+                    ROW_HEIGHT_PT = 170
+                    COL_WIDTH = 55
+
+                    ws.column_dimensions[img_col_letter].width = COL_WIDTH
+
+                    for row_idx, filepath in screenshot_map.items():
+                        if not filepath:
+                            continue
+                        p = _Path(filepath)
+                        if not p.exists():
+                            continue
+
+                        excel_row = row_idx + 2
+
+                        # Resize thumbnail bằng Pillow trước khi nhúng
+                        with PILImage.open(p) as pil_img:
+                            pil_img.thumbnail((THUMB_W, THUMB_H), PILImage.LANCZOS)
+                            thumb_buf = io.BytesIO()
+                            pil_img.save(thumb_buf, format="PNG")
+                            thumb_buf.seek(0)
+
+                        xl_img = XLImage(thumb_buf)
+                        xl_img.width = THUMB_W
+                        xl_img.height = THUMB_H
+                        xl_img.anchor = f"{img_col_letter}{excel_row}"
+
+                        ws.add_image(xl_img)
+                        ws.row_dimensions[excel_row].height = ROW_HEIGHT_PT
+
+                final_buffer = io.BytesIO()
+                wb.save(final_buffer)
+                final_buffer.seek(0)
+                out_buffer = final_buffer
+
+            except Exception as img_err:
+                print(f"[WARN] Không thể xử lý cột ảnh trong Excel: {img_err}")
+                out_buffer.seek(0)
+
             return StreamingResponse(
                 out_buffer,
                 media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                headers={"Content-Disposition": "attachment; filename=batch_valuation_result.xlsx"}
+                headers={"Content-Disposition": "attachment; filename=batch_valuation_result.xlsx"},
             )
         else:
-            # Ghi ra file CSV
+            # ── CSV fallback (Link_anh đã nằm trong processed_rows) ──
             output = io.StringIO()
             writer = csv.writer(output)
-            output.write('\ufeff')  # BOM cho tiếng Việt hiển thị tốt trong Excel
+            output.write("\ufeff")  # BOM cho tiếng Việt hiển thị tốt trong Excel
             writer.writerow(output_headers)
             writer.writerows(processed_rows)
             output.seek(0)
-            
+
             return StreamingResponse(
-                io.BytesIO(output.getvalue().encode('utf-8')),
+                io.BytesIO(output.getvalue().encode("utf-8")),
                 media_type="text/csv",
-                headers={"Content-Disposition": "attachment; filename=batch_valuation_result.csv"}
+                headers={"Content-Disposition": "attachment; filename=batch_valuation_result.csv"},
             )
-            
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
 
 @router.get("/valuate/test_batch")
 async def test_batch():
