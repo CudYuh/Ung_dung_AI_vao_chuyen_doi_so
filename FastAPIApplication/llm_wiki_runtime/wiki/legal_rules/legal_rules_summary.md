@@ -1,6 +1,10 @@
 # Legal Rules / Chuẩn mực định giá cho AI
 
+<<<<<<< HEAD
 Cập nhật lần cuối: 14/06/2026 03:11:56
+=======
+Cập nhật lần cuối: 14/06/2026 11:00:52
+>>>>>>> 68f984a34c7b3e9a67b25f5ad4f76c19c561e1b7
 
 ## Văn bản pháp lý và chuẩn mực sử dụng
 

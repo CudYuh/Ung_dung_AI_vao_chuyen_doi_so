@@ -92,3 +92,4 @@
 - 14/06/2026 17:02:21 — Sync vật tư mới/cập nhật vào LLM Wiki: Samsung Galaxy S24 - ID 1978.0.
 - 14/06/2026 17:09:10 — Sync vật tư mới/cập nhật vào LLM Wiki: Điện thoại Samsung Galaxy A56 5G - ID 1979.0.
 - 14/06/2026 17:09:10 — Sync vật tư mới/cập nhật vào LLM Wiki: Tai nghe JBL Tune Beam 2 - ID 1980.0.
+- 14/06/2026 10:55:40 — Sync vật tư mới/cập nhật vào LLM Wiki: Điện thoại Iphone 15 promax bản 128gb màu trắng - ID 1886.0.

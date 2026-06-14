@@ -31853,3 +31853,14 @@ vat_tu/1980_tai_nghe_jbl_tune_beam_2,Tai nghe JBL Tune Beam 2,data/appraisal_dat
 vat_tu/1980_tai_nghe_jbl_tune_beam_2,Tai nghe JBL Tune Beam 2,data/certificate/ai_batch_20260614170910,AI-BATCH-20260614170910,co_chung_thu,có chứng thư
 vat_tu/1980_tai_nghe_jbl_tune_beam_2,Tai nghe JBL Tune Beam 2,data/source/https_cellphones_com_vn_tai_nghe_khong_day_jbl_tune_beam_2_html,https://cellphones.com.vn/tai-nghe-khong-day-jbl-tune-beam-2.html,co_nguon_du_lieu,có nguồn dữ liệu
 vat_tu/1980_tai_nghe_jbl_tune_beam_2,Tai nghe JBL Tune Beam 2,data/appraiser/ai_batch_system,AI Batch System,co_nguoi_tham_dinh,có người thẩm định
+vat_tu/1886_dien_thoai_iphone_15_promax_ban_128gb_mau_trang,Điện thoại Iphone 15 promax bản 128gb màu trắng,concept/gia_tham_chieu,Giá tham chiếu,thuoc_concept,thuộc concept
+vat_tu/1886_dien_thoai_iphone_15_promax_ban_128gb_mau_trang,Điện thoại Iphone 15 promax bản 128gb màu trắng,concept/nguon_du_lieu,Nguồn dữ liệu,thuoc_concept,thuộc concept
+vat_tu/1886_dien_thoai_iphone_15_promax_ban_128gb_mau_trang,Điện thoại Iphone 15 promax bản 128gb màu trắng,concept/quy_tac_chon_gia,Quy tắc chọn giá,thuoc_concept,thuộc concept
+vat_tu/1886_dien_thoai_iphone_15_promax_ban_128gb_mau_trang,Điện thoại Iphone 15 promax bản 128gb màu trắng,concept/vat_tu_tuong_tu,Vật tư tương tự,thuoc_concept,thuộc concept
+vat_tu/1886_dien_thoai_iphone_15_promax_ban_128gb_mau_trang,Điện thoại Iphone 15 promax bản 128gb màu trắng,concept/second_brain,Second Brain,thuoc_concept,thuộc concept
+vat_tu/1886_dien_thoai_iphone_15_promax_ban_128gb_mau_trang,Điện thoại Iphone 15 promax bản 128gb màu trắng,data/price/13_160_000,13.160.000,co_gia,có giá
+vat_tu/1886_dien_thoai_iphone_15_promax_ban_128gb_mau_trang,Điện thoại Iphone 15 promax bản 128gb màu trắng,data/unit/cai,Cái,co_don_vi_tinh,có đơn vị tính
+vat_tu/1886_dien_thoai_iphone_15_promax_ban_128gb_mau_trang,Điện thoại Iphone 15 promax bản 128gb màu trắng,data/appraisal_date/14_06_2026,14/06/2026,co_ngay_tham_dinh,có ngày thẩm định
+vat_tu/1886_dien_thoai_iphone_15_promax_ban_128gb_mau_trang,Điện thoại Iphone 15 promax bản 128gb màu trắng,data/certificate/ai_batch_20260614105540,AI-BATCH-20260614105540,co_chung_thu,có chứng thư
+vat_tu/1886_dien_thoai_iphone_15_promax_ban_128gb_mau_trang,Điện thoại Iphone 15 promax bản 128gb màu trắng,data/source/https_www_thegioididong_com_hoi_dap_tong_hop_bang_gia_iphone_hien_nay_moi_nhat_n,https://www.thegioididong.com/hoi-dap/tong-hop-bang-gia-iphone-hien-nay-moi-nhat-nam-1466393,co_nguon_du_lieu,có nguồn dữ liệu
+vat_tu/1886_dien_thoai_iphone_15_promax_ban_128gb_mau_trang,Điện thoại Iphone 15 promax bản 128gb màu trắng,data/appraiser/ai_batch_system,AI Batch System,co_nguoi_tham_dinh,có người thẩm định
