@@ -89,3 +89,4 @@
 - 14/06/2026 01:28:27 — Sync vật tư mới/cập nhật vào LLM Wiki: Tai nghe  Sony WF-C710N - ID 1975.0.
 - 14/06/2026 01:28:27 — Sync vật tư mới/cập nhật vào LLM Wiki: Máy tính bảng  Samsung Galaxy Tab A10 - ID 1976.0.
 - 14/06/2026 01:28:28 — Sync vật tư mới/cập nhật vào LLM Wiki: Router WiFi  TP-Link Archer BE230 - ID 1977.0.
+- 14/06/2026 10:55:40 — Sync vật tư mới/cập nhật vào LLM Wiki: Điện thoại Iphone 15 promax bản 128gb màu trắng - ID 1886.0.
