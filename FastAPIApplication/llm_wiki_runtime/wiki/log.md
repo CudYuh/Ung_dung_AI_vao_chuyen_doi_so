@@ -89,3 +89,6 @@
 - 14/06/2026 01:28:27 — Sync vật tư mới/cập nhật vào LLM Wiki: Tai nghe  Sony WF-C710N - ID 1975.0.
 - 14/06/2026 01:28:27 — Sync vật tư mới/cập nhật vào LLM Wiki: Máy tính bảng  Samsung Galaxy Tab A10 - ID 1976.0.
 - 14/06/2026 01:28:28 — Sync vật tư mới/cập nhật vào LLM Wiki: Router WiFi  TP-Link Archer BE230 - ID 1977.0.
+- 14/06/2026 17:02:21 — Sync vật tư mới/cập nhật vào LLM Wiki: Samsung Galaxy S24 - ID 1978.0.
+- 14/06/2026 17:09:10 — Sync vật tư mới/cập nhật vào LLM Wiki: Điện thoại Samsung Galaxy A56 5G - ID 1979.0.
+- 14/06/2026 17:09:10 — Sync vật tư mới/cập nhật vào LLM Wiki: Tai nghe JBL Tune Beam 2 - ID 1980.0.

@@ -30,7 +30,7 @@ except Exception:
 APP_DIR = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = APP_DIR.parent
 OBSIDIAN_LEGAL_DIR = PROJECT_ROOT / "Kho_Tri_Thuc_Phap_Ly"
-ENV_PATH = APP_DIR / ".env"
+ENV_PATH = PROJECT_ROOT / ".env"
 load_dotenv(dotenv_path=ENV_PATH)
 
 

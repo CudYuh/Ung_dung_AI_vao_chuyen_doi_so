@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 # ================= CẤU HÌNH =================
-ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
+ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "dummy")

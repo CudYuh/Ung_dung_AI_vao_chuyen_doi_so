@@ -991,7 +991,6 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
                     
                 # Định dạng giá cho Excel/CSV (luôn hiển thị dấu chấm và căn trái)
                 if price and price not in ("Không đủ dữ liệu", "Không có dữ liệu"):
-                    import re
                     num_str = re.sub(r'[^\d]', '', price)
                     if num_str:
                         formatted = f"{int(num_str):,}".replace(",", ".")
@@ -1052,11 +1051,19 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
         # ── Chụp ảnh màn hình ĐỒNG BỘ (foreground) để có filepath trước khi xuất Excel ──
         screenshot_map: Dict[int, str] = {}
         if screenshot_jobs:
-            screenshot_map = await run_in_threadpool(
-                take_batch_screenshots_sync, screenshot_jobs[:30]
-            )
-        # ── Thêm cột Link_anh vào processed_rows (HYPERLINK do pandas ghi, giống Link_tham_khao) ──
-        output_headers = headers + ["Gia_du_kien", "Gia_trong_CSDL", "Link_tham_khao", "Ghi_chu", "Link_anh"]
+            print(f"[BATCH SCREENSHOT] Bắt đầu chụp {len(screenshot_jobs)} ảnh...")
+            try:
+                screenshot_map = await run_in_threadpool(
+                    take_batch_screenshots_sync, screenshot_jobs[:30]
+                )
+                print(f"[BATCH SCREENSHOT] Hoàn tất. Có {len(screenshot_map)} ảnh thành công.")
+            except Exception as ss_err:
+                print(f"[BATCH SCREENSHOT ERROR] Lỗi khi chụp ảnh: {ss_err}")
+        else:
+            print("[BATCH SCREENSHOT] Không có link hợp lệ để chụp ảnh.")
+
+        # ── Thêm cột Link_anh + Anh_san_pham vào processed_rows ──
+        output_headers = headers + ["Gia_du_kien", "Gia_trong_CSDL", "Link_tham_khao", "Ghi_chu", "Link_anh", "Anh_san_pham"]
 
         for r_idx in range(len(processed_rows)):
             filepath = screenshot_map.get(r_idx, "")
@@ -1067,55 +1074,82 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
                 excel_link_anh = f'=HYPERLINK("{full_path}","Mở ảnh")'
             else:
                 excel_link_anh = ""
+            # Link_anh (HYPERLINK) + Anh_san_pham (placeholder, ảnh sẽ được nhúng bởi openpyxl)
             processed_rows[r_idx].append(excel_link_anh)
+            processed_rows[r_idx].append("")  # Placeholder cho cột Anh_san_pham
 
-        if is_excel:
-            # ── Xuất Excel và nhúng ảnh trực tiếp vào cột Anh_san_pham ──
-            out_df = pd.DataFrame(processed_rows, columns=output_headers)
-            out_buffer = io.BytesIO()
-            out_df.to_excel(out_buffer, index=False, engine="openpyxl")
-            out_buffer.seek(0)
+        # ── Xuất Excel và nhúng ảnh trực tiếp vào cột Anh_san_pham ──
+        out_df = pd.DataFrame(processed_rows, columns=output_headers)
+        out_buffer = io.BytesIO()
+        out_df.to_excel(out_buffer, index=False, engine="openpyxl")
+        out_buffer.seek(0)
 
+        # Debug log file
+        _debug_log = Path(__file__).resolve().parents[2] / "batch_debug.log"
+        def _log(msg):
+            print(msg)
             try:
-                from openpyxl import load_workbook
-                from openpyxl.drawing.image import Image as XLImage
-                from openpyxl.utils import get_column_letter
-                from openpyxl.styles import Font, Alignment
-                from PIL import Image as PILImage
-                from pathlib import Path as _Path
+                with open(_debug_log, "a", encoding="utf-8") as f:
+                    f.write(msg + "\n")
+            except:
+                pass
+                
+        try:
+            with open(_debug_log, "w", encoding="utf-8") as f:
+                f.write("=== BATCH DEBUG LOG ===\n")
+        except:
+            pass
+            
+        _log(f"screenshot_map: {dict(screenshot_map)}")
+        _log(f"output_headers: {output_headers}")
+        _log(f"len(processed_rows): {len(processed_rows)}, len(processed_rows[0]): {len(processed_rows[0]) if processed_rows else 0}")
+        _log(f"out_buffer size after to_excel: {out_buffer.getbuffer().nbytes}")
 
-                wb = load_workbook(out_buffer)
-                ws = wb.active
+        try:
+            from openpyxl import load_workbook
+            from openpyxl.drawing.image import Image as XLImage
+            from openpyxl.utils import get_column_letter
+            from openpyxl.styles import Font, Alignment
+            from PIL import Image as PILImage
+            from pathlib import Path as _Path
 
-                # ── Điều chỉnh chiều rộng cột Link_anh cho gọn ──
-                link_anh_col_idx = len(output_headers)  # cột cuối cùng
-                link_anh_col_letter = get_column_letter(link_anh_col_idx)
-                ws.column_dimensions[link_anh_col_letter].width = 15
+            wb = load_workbook(out_buffer)
+            ws = wb.active
 
-                # ── Cột Anh_san_pham (nhúng ảnh thumbnail) ──
-                if screenshot_map:
-                    img_col_idx = len(output_headers) + 1
-                    img_col_letter = get_column_letter(img_col_idx)
-                    ws[f"{img_col_letter}1"] = "Anh_san_pham"
-                    ws[f"{img_col_letter}1"].font = Font(bold=True)
+            # ── Điều chỉnh chiều rộng cột Link_anh cho gọn ──
+            link_anh_col_idx = output_headers.index("Link_anh") + 1  # 1-indexed
+            link_anh_col_letter = get_column_letter(link_anh_col_idx)
+            ws.column_dimensions[link_anh_col_letter].width = 15
 
-                    # Kích thước thumbnail hiển thị trong Excel (400x225px)
-                    THUMB_W = 400
-                    THUMB_H = 225
-                    ROW_HEIGHT_PT = 170
-                    COL_WIDTH = 55
+            # ── Cột Anh_san_pham (nhúng ảnh thumbnail) ──
+            img_col_idx = output_headers.index("Anh_san_pham") + 1  # 1-indexed
+            img_col_letter = get_column_letter(img_col_idx)
+            ws[f"{img_col_letter}1"].font = Font(bold=True)
 
-                    ws.column_dimensions[img_col_letter].width = COL_WIDTH
+            # Kích thước thumbnail hiển thị trong Excel (400x225px)
+            THUMB_W = 400
+            THUMB_H = 225
+            ROW_HEIGHT_PT = 170
+            COL_WIDTH = 55
 
-                    for row_idx, filepath in screenshot_map.items():
-                        if not filepath:
-                            continue
-                        p = _Path(filepath)
-                        if not p.exists():
-                            continue
+            ws.column_dimensions[img_col_letter].width = COL_WIDTH
 
-                        excel_row = row_idx + 2
+            _log(f"[EXCEL IMG] screenshot_map keys: {list(screenshot_map.keys())}, img_col: {img_col_letter}")
 
+            embedded_count = 0
+            if screenshot_map:
+                for row_idx, filepath in screenshot_map.items():
+                    if not filepath:
+                        _log(f"[EXCEL IMG] row_idx={row_idx}: filepath rỗng, bỏ qua")
+                        continue
+                    p = _Path(filepath)
+                    if not p.exists():
+                        _log(f"[EXCEL IMG] row_idx={row_idx}: File không tồn tại: {filepath}")
+                        continue
+
+                    excel_row = row_idx + 2
+
+                    try:
                         # Resize thumbnail bằng Pillow trước khi nhúng
                         with PILImage.open(p) as pil_img:
                             pil_img.thumbnail((THUMB_W, THUMB_H), PILImage.LANCZOS)
@@ -1130,35 +1164,32 @@ async def valuate_batch(file: UploadFile = File(...), background_tasks: Backgrou
 
                         ws.add_image(xl_img)
                         ws.row_dimensions[excel_row].height = ROW_HEIGHT_PT
+                        embedded_count += 1
+                        _log(f"[EXCEL IMG] Nhúng ảnh thành công: row={excel_row}, anchor={img_col_letter}{excel_row}")
+                    except Exception as embed_err:
+                        _log(f"[EXCEL IMG] Lỗi nhúng ảnh hàng {excel_row}: {type(embed_err).__name__}: {embed_err}")
+            else:
+                _log("[EXCEL IMG] screenshot_map rỗng, không có ảnh để nhúng")
 
-                final_buffer = io.BytesIO()
-                wb.save(final_buffer)
-                final_buffer.seek(0)
-                out_buffer = final_buffer
+            _log(f"[EXCEL IMG] Tổng ảnh đã nhúng: {embedded_count}/{len(screenshot_map)}")
 
-            except Exception as img_err:
-                print(f"[WARN] Không thể xử lý cột ảnh trong Excel: {img_err}")
-                out_buffer.seek(0)
+            final_buffer = io.BytesIO()
+            wb.save(final_buffer)
+            final_buffer.seek(0)
+            out_buffer = final_buffer
+            _log(f"[EXCEL IMG] Đã save workbook với ảnh. Buffer size: {final_buffer.getbuffer().nbytes} bytes")
 
-            return StreamingResponse(
-                out_buffer,
-                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                headers={"Content-Disposition": "attachment; filename=batch_valuation_result.xlsx"},
-            )
-        else:
-            # ── CSV fallback (Link_anh đã nằm trong processed_rows) ──
-            output = io.StringIO()
-            writer = csv.writer(output)
-            output.write("\ufeff")  # BOM cho tiếng Việt hiển thị tốt trong Excel
-            writer.writerow(output_headers)
-            writer.writerows(processed_rows)
-            output.seek(0)
+        except Exception as img_err:
+            import traceback
+            _log(f"[WARN] Không thể xử lý cột ảnh trong Excel: {type(img_err).__name__}: {img_err}")
+            traceback.print_exc()
+            out_buffer.seek(0)
 
-            return StreamingResponse(
-                io.BytesIO(output.getvalue().encode("utf-8")),
-                media_type="text/csv",
-                headers={"Content-Disposition": "attachment; filename=batch_valuation_result.csv"},
-            )
+        return StreamingResponse(
+            out_buffer,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=batch_valuation_result.xlsx"},
+        )
 
     except Exception as e:
         return {"status": "error", "message": str(e)}

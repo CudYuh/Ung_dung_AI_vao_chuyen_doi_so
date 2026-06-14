@@ -29623,5 +29623,50 @@
     "appraiser": "AI Batch System",
     "page_path": "entities/vat_tu/1977_router_wifi_tp_link_archer_be230.md",
     "search_text": "router wifi tp link archer be230 cai 2159000 ai batch 20260614012827 https maxsmart vn product wifi tp link archer be230 router wifi 7 ho tro 100 user toc do 3570mbps ai batch system"
+  },
+  {
+    "id": 1978.0,
+    "source_id": "vat_tu/1978_samsung_galaxy_s24",
+    "name": "Samsung Galaxy S24",
+    "category": "",
+    "unit": "Cái",
+    "specifications": "",
+    "price": "16790000",
+    "certificate_number": "AI-BATCH-20260614170221",
+    "appraisal_date": "14/06/2026",
+    "source": "https://cellphones.com.vn/samsung-galaxy-s24.html",
+    "appraiser": "AI Batch System",
+    "page_path": "entities/vat_tu/1978_samsung_galaxy_s24.md",
+    "search_text": "samsung galaxy s24 cai 16790000 ai batch 20260614170221 https cellphones com vn samsung galaxy s24 html ai batch system"
+  },
+  {
+    "id": 1979.0,
+    "source_id": "vat_tu/1979_dien_thoai_samsung_galaxy_a56_5g",
+    "name": "Điện thoại Samsung Galaxy A56 5G",
+    "category": "",
+    "unit": "Cái",
+    "specifications": "",
+    "price": "8.990.000",
+    "certificate_number": "AI-BATCH-20260614170910",
+    "appraisal_date": "14/06/2026",
+    "source": "https://cellphones.com.vn/dien-thoai-samsung-galaxy-a56.html",
+    "appraiser": "AI Batch System",
+    "page_path": "entities/vat_tu/1979_dien_thoai_samsung_galaxy_a56_5g.md",
+    "search_text": "dien thoai samsung galaxy a56 5g cai 8 990 000 ai batch 20260614170910 https cellphones com vn dien thoai samsung galaxy a56 html ai batch system"
+  },
+  {
+    "id": 1980.0,
+    "source_id": "vat_tu/1980_tai_nghe_jbl_tune_beam_2",
+    "name": "Tai nghe JBL Tune Beam 2",
+    "category": "",
+    "unit": "Cái",
+    "specifications": "",
+    "price": "2150000",
+    "certificate_number": "AI-BATCH-20260614170910",
+    "appraisal_date": "14/06/2026",
+    "source": "https://cellphones.com.vn/tai-nghe-khong-day-jbl-tune-beam-2.html",
+    "appraiser": "AI Batch System",
+    "page_path": "entities/vat_tu/1980_tai_nghe_jbl_tune_beam_2.md",
+    "search_text": "tai nghe jbl tune beam 2 cai 2150000 ai batch 20260614170910 https cellphones com vn tai nghe khong day jbl tune beam 2 html ai batch system"
   }
 ]

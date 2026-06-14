@@ -96,6 +96,7 @@ cd FastAPIApplication
 
 # 4. Chạy server ở chế độ reload (tự động cập nhật khi có thay đổi code)
 uv run uvicorn main:app --reload
+uvicorn main:app --reload
 ```
 > Sau khi chạy, API Documentation (Swagger UI) sẽ có tại: `http://127.0.0.1:8000/docs`
 
