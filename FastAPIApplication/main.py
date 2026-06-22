@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from routers import questions_and_answers, products, valuation_api, wiki, domain_registry_api, legal_knowledge
+from routers import questions_and_answers, products, valuation_api, wiki, domain_registry_api, legal_knowledge, auth
 import models
+import user_model
 from database import engine
 import os
 
@@ -51,6 +52,7 @@ app.include_router(router=valuation_api.router)
 app.include_router(router=wiki.router)
 app.include_router(router=domain_registry_api.router)
 app.include_router(router=legal_knowledge.router)
+app.include_router(router=auth.router)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCREENSHOTS_DIR = os.path.join(BASE_DIR, "screenshots")

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import ObsidianLegalGraph from "./components/ObsidianLegalGraph";
+import LoginPage from "./components/LoginPage";
 import axios from "axios";
 import {
   Search,
@@ -28,12 +29,50 @@ import {
   Plus,
   Trash2,
   ExternalLink,
+  LogOut,
 } from "lucide-react";
 
 const API_BASE_URL = "http://localhost:8000";
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem("token"));
   const [activeTab, setActiveTab] = useState("valuation");
+
+  // Thiết lập interceptor cho axios để tự động truyền token nếu có
+  useEffect(() => {
+    const requestInterceptor = axios.interceptors.request.use(
+      (config) => {
+        const token = localStorage.getItem("token");
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      (error) => {
+        return Promise.reject(error);
+      }
+    );
+
+    const responseInterceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && error.response.status === 401) {
+          localStorage.removeItem("token");
+          setIsAuthenticated(false);
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.request.eject(requestInterceptor);
+      axios.interceptors.response.eject(responseInterceptor);
+    };
+  }, []);
+
+  if (!isAuthenticated) {
+    return <LoginPage onLogin={() => setIsAuthenticated(true)} />;
+  }
   const [query, setQuery] = useState("");
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -370,7 +409,7 @@ function App() {
     <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-blue-500/30">
       <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4">
-          <div className="flex items-center gap-8 h-16">
+          <div className="flex items-center justify-between h-16">
             <div className="flex gap-4">
               <button
                 onClick={() => setActiveTab("valuation")}
@@ -406,6 +445,17 @@ function App() {
                 Quản lý Domain
               </button>
             </div>
+            
+            <button
+              onClick={() => {
+                localStorage.removeItem("token");
+                setIsAuthenticated(false);
+              }}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Đăng xuất
+            </button>
           </div>
         </div>
       </nav>
